@@ -8,6 +8,7 @@ import { LoggerModule } from "@/shared/logger/logger.module";
 
 import { UserModule } from "@/contexts/users/user.module";
 import { ProductsModule } from "../contexts/products/products.module";
+import { ProvidersModule } from "../contexts/providers/providers.module";
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ProductsModule } from "../contexts/products/products.module";
     HealthModule,
     UserModule,
     ProductsModule,
+    ProvidersModule,
   ],
 })
 export class AppModule {}
