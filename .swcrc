@@ -22,7 +22,7 @@
     "target": "esnext"
   },
   "module": {
-    "type": "es6",
+    "type": "commonjs",
     "resolveFully": true
   },
   "minify": false

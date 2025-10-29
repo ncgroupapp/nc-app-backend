@@ -4,7 +4,6 @@
   "description": "Template for new nestjs services",
   "author": "alberthernandezdev@gmail.com",
   "license": "MIT",
-  "type": "module",
   "bugs": {
     "url": "https://github.com/AlbertHernandez/nestjs-service-template/issues"
   },
@@ -49,8 +48,13 @@
     "@nestjs/core": "^10.4.6",
     "@nestjs/platform-fastify": "^10.4.6",
     "@nestjs/swagger": "^11.2.1",
+    "@nestjs/typeorm": "^11.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "typeorm": "^0.3.27"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
@@ -62,6 +66,7 @@
     "@swc/core": "^1.13.5",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.8.7",
+    "@types/pg": "^8.15.6",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",

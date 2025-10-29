@@ -1,4 +1,7 @@
-import { Logger } from "@nestjs/common";
+// Setup global polyfills before importing any NestJS modules
+import "./setup-globals";
+
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import {
@@ -13,6 +16,14 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
+  );
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
   );
 
   const configService = app.get(ConfigService);
