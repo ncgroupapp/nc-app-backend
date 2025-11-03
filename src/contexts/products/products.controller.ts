@@ -55,4 +55,12 @@ export class ProductsController {
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.productsService.remove(id);
   }
+
+  @Get('check-sku/:sku')
+  @ApiOperation({ summary: 'Check if a SKU exists' })
+  @ApiResponse({ status: 200, description: 'SKU check result', schema: { type: 'object', properties: { exists: { type: 'boolean' }, sku: { type: 'string' } } } })
+  async checkSku(@Param('sku') sku: string): Promise<{ exists: boolean; sku: string }> {
+    const exists = await this.productsService.checkSkuExists(sku);
+    return { exists, sku };
+  }
 }
