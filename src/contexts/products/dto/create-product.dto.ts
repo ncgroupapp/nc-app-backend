@@ -1,24 +1,99 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, IsArray, IsUrl } from 'class-validator';
 
 export class CreateProductDto {
+  @ApiProperty({ 
+    description: 'Product SKU (required)', 
+    example: 'TOR-2332-01', 
+    required: true 
+  })
+  @IsString()
+  @IsNotEmpty()
+  sku!: string;
+
   @ApiProperty({ description: 'Product name', example: 'Laptop' })
   @IsString()
   @IsNotEmpty()
   name!: string;
 
+  @ApiProperty({ description: 'Product image URL', example: 'https://example.com/image.jpg', required: false })
+  @IsString()
+  @IsOptional()
+  @IsUrl()
+  image?: string;
+
+  @ApiProperty({ description: 'Product suppliers', example: ['Supplier A', 'Supplier B'], required: false })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  suppliers?: string[];
+
+  @ApiProperty({ description: 'Product brand', example: 'Dell', required: false })
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @ApiProperty({ description: 'Product model', example: 'XPS 13', required: false })
+  @IsString()
+  @IsOptional()
+  model?: string;
+
+  @ApiProperty({ description: 'Stock quantity', example: 10, required: false, default: 0 })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  stockQuantity?: number;
+
+  @ApiProperty({ description: 'Product details', example: 'High-performance laptop with SSD', required: false })
+  @IsString()
+  @IsOptional()
+  details?: string;
+
+  @ApiProperty({ description: 'Product observations', example: 'Handle with care', required: false })
+  @IsString()
+  @IsOptional()
+  observations?: string;
+
+  @ApiProperty({ description: 'Chassis information', example: 'Aluminum unibody', required: false })
+  @IsString()
+  @IsOptional()
+  chassis?: string;
+
+  @ApiProperty({ description: 'Motor information', example: 'V6 2.5L', required: false })
+  @IsString()
+  @IsOptional()
+  motor?: string;
+
+  @ApiProperty({ description: 'Equipment information', example: 'Standard equipment package', required: false })
+  @IsString()
+  @IsOptional()
+  equipment?: string;
+
+  @ApiProperty({ description: 'Previous quotes history', example: [], required: false })
+  @IsArray()
+  @IsOptional()
+  quotationHistory?: any[];
+
+  @ApiProperty({ description: 'Previous adjudications history', example: [], required: false })
+  @IsArray()
+  @IsOptional()
+  adjudicationHistory?: any[];
+
+  // Legacy fields for backward compatibility
   @ApiProperty({ description: 'Product description', example: 'High-performance laptop', required: false })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ description: 'Product price', example: 999.99 })
+  @ApiProperty({ description: 'Product price', example: 999.99, required: false })
   @IsNumber()
+  @IsOptional()
   @Min(0)
-  price!: number;
+  price?: number;
 
-  @ApiProperty({ description: 'Product stock', example: 10, default: 0 })
+  @ApiProperty({ description: 'Product stock', example: 10, default: 0, required: false })
   @IsNumber()
+  @IsOptional()
   @Min(0)
-  stock!: number;
+  stock?: number;
 }

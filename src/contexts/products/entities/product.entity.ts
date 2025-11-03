@@ -5,17 +5,57 @@ export class Product {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  @Column({ type: 'varchar', length: 100, unique: true, nullable: false })
+  sku!: string;
+
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  image?: string;
+
+  @Column({ type: 'json', nullable: true })
+  suppliers?: string[];
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  brand?: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  model?: string;
+
+  @Column({ type: 'int', nullable: true, default: 0 })
+  stockQuantity?: number;
+
   @Column({ type: 'text', nullable: true })
-  description!: string;
+  details?: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  price!: number;
+  @Column({ type: 'text', nullable: true })
+  observations?: string;
 
-  @Column({ type: 'int', default: 0 })
-  stock!: number;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  chassis?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  motor?: string;
+
+  @Column({ type: 'text', nullable: true })
+  equipment?: string;
+
+  @Column({ type: 'json', nullable: true })
+  quotationHistory?: any[];
+
+  @Column({ type: 'json', nullable: true })
+  adjudicationHistory?: any[];
+
+  // Legacy fields for backward compatibility
+  @Column({ type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  price?: number;
+
+  @Column({ type: 'int', nullable: true, default: 0 })
+  stock?: number;
 
   @CreateDateColumn()
   createdAt!: Date;
