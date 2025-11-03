@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, IsArray, IsUrl } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, IsArray, IsUrl, IsInt } from 'class-validator';
 
 export class CreateProductDto {
   @ApiProperty({ 
@@ -22,11 +22,12 @@ export class CreateProductDto {
   @IsUrl()
   image?: string;
 
-  @ApiProperty({ description: 'Product suppliers', example: ['Supplier A', 'Supplier B'], required: false })
+  @ApiProperty({ description: 'Provider IDs', example: [1, 2, 3], required: false })
   @IsArray()
-  @IsString({ each: true })
+  @IsNumber({}, { each: true })
+  @IsInt({ each: true })
   @IsOptional()
-  suppliers?: string[];
+  providerIds?: number[];
 
   @ApiProperty({ description: 'Product brand', example: 'Dell', required: false })
   @IsString()

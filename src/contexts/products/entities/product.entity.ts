@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable } from 'typeorm';
+import { Provider } from '../../providers/entities/provider.entity';
 
 @Entity('products')
 export class Product {
@@ -14,8 +15,13 @@ export class Product {
   @Column({ type: 'varchar', length: 500, nullable: true })
   image?: string;
 
-  @Column({ type: 'json', nullable: true })
-  suppliers?: string[];
+  @ManyToMany(() => Provider, { eager: false })
+  @JoinTable({
+    name: 'product_providers',
+    joinColumn: { name: 'productId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'providerId', referencedColumnName: 'id' }
+  })
+  providers?: Provider[];
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   brand?: string;

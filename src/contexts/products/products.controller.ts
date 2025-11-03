@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, ParseIntPipe, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, ParseIntPipe, NotFoundException, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -19,9 +19,18 @@ export class ProductsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all products' })
+  @ApiQuery({ name: 'sku', required: false, description: 'Filter products by SKU (partial match)' })
   @ApiResponse({ status: 200, description: 'List of products', type: [Product] })
-  async findAll(): Promise<Product[]> {
-    return this.productsService.findAll();
+  async findAll(@Query('sku') sku?: string): Promise<Product[]> {
+    return this.productsService.findAll(sku);
+  }
+
+  @Get('check-sku/:sku')
+  @ApiOperation({ summary: 'Check if a SKU exists' })
+  @ApiResponse({ status: 200, description: 'SKU check result', schema: { type: 'object', properties: { exists: { type: 'boolean' }, sku: { type: 'string' } } } })
+  async checkSku(@Param('sku') sku: string): Promise<{ exists: boolean; sku: string }> {
+    const exists = await this.productsService.checkSkuExists(sku);
+    return { exists, sku };
   }
 
   @Get(':id')
@@ -54,13 +63,5 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Product not found' })
   async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     await this.productsService.remove(id);
-  }
-
-  @Get('check-sku/:sku')
-  @ApiOperation({ summary: 'Check if a SKU exists' })
-  @ApiResponse({ status: 200, description: 'SKU check result', schema: { type: 'object', properties: { exists: { type: 'boolean' }, sku: { type: 'string' } } } })
-  async checkSku(@Param('sku') sku: string): Promise<{ exists: boolean; sku: string }> {
-    const exists = await this.productsService.checkSkuExists(sku);
-    return { exists, sku };
   }
 }
