@@ -69,7 +69,7 @@ export class LicitationsService {
       deadlineDate: deadline,
       client,
       products,
-      status: createLicitationDto.status || LicitationStatus.EN_ESPERA,
+      status: createLicitationDto.status || LicitationStatus.PENDING,
     });
 
     return this.licitationRepository.save(licitation);

@@ -13,10 +13,10 @@ import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
 
 export enum LicitationStatus {
-  EN_ESPERA = "En espera",
-  ADJUDICACION_PARCIAL = "Adjudicación Parcial",
-  NO_ADJUDICADA = "No Adjudicada",
-  ADJUDICACION_TOTAL = "Adjudicación Total",
+  PENDING = "Pending",
+  PARTIAL_ADJUDICATION = "Partial Adjudication",
+  NOT_ADJUDICATED = "Not Adjudicated",
+  TOTAL_ADJUDICATION = "Total Adjudication",
 }
 
 @Entity("licitations")
@@ -54,7 +54,7 @@ export class Licitation {
   @Column({
     type: "enum",
     enum: LicitationStatus,
-    default: LicitationStatus.EN_ESPERA,
+    default: LicitationStatus.PENDING,
   })
   status!: LicitationStatus;
 

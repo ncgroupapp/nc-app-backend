@@ -72,7 +72,7 @@ export class CreateLicitationDto {
   @ApiProperty({
     description: "Status of the licitation",
     enum: LicitationStatus,
-    example: LicitationStatus.EN_ESPERA,
+    example: LicitationStatus.PENDING,
     required: false,
   })
   @IsEnum(LicitationStatus)
