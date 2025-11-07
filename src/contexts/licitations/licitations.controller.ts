@@ -10,6 +10,7 @@ import {
   HttpStatus,
   ParseIntPipe,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -24,6 +25,8 @@ import { Licitation } from "./entities/licitation.entity";
 @ApiTags("licitations")
 @Controller("licitations")
 export class LicitationsController {
+  private readonly logger = new Logger(LicitationsController.name);
+
   constructor(private readonly licitationsService: LicitationsService) {}
 
   @Post()
@@ -38,6 +41,7 @@ export class LicitationsController {
   async create(
     @Body() createLicitationDto: CreateLicitationDto,
   ): Promise<Licitation> {
+    this.logger.log(`POST /licitations - Creating licitation with call number: ${createLicitationDto.callNumber}`);
     return this.licitationsService.create(createLicitationDto);
   }
 
@@ -49,6 +53,7 @@ export class LicitationsController {
     type: [Licitation],
   })
   async findAll(): Promise<Licitation[]> {
+    this.logger.debug("GET /licitations");
     return this.licitationsService.findAll();
   }
 
@@ -61,8 +66,10 @@ export class LicitationsController {
   })
   @ApiResponse({ status: 404, description: "Licitation not found" })
   async findOne(@Param("id", ParseIntPipe) id: number): Promise<Licitation> {
+    this.logger.debug(`GET /licitations/${id}`);
     const licitation = await this.licitationsService.findOne(id);
     if (!licitation) {
+      this.logger.warn(`Licitation with ID ${id} not found`);
       throw new NotFoundException(`Licitation with ID ${id} not found`);
     }
     return licitation;
@@ -81,6 +88,7 @@ export class LicitationsController {
     @Param("id", ParseIntPipe) id: number,
     @Body() updateLicitationDto: UpdateLicitationDto,
   ): Promise<Licitation> {
+    this.logger.log(`PATCH /licitations/${id} - Updating licitation`);
     return this.licitationsService.update(id, updateLicitationDto);
   }
 
@@ -93,6 +101,7 @@ export class LicitationsController {
   })
   @ApiResponse({ status: 404, description: "Licitation not found" })
   async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
+    this.logger.log(`DELETE /licitations/${id} - Deleting licitation`);
     await this.licitationsService.remove(id);
   }
 }

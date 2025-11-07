@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
@@ -13,6 +14,8 @@ import { Product } from "@/contexts/products/entities/product.entity";
 
 @Injectable()
 export class LicitationsService {
+  private readonly logger = new Logger(LicitationsService.name);
+
   constructor(
     @InjectRepository(Licitation)
     private readonly licitationRepository: Repository<Licitation>,
@@ -25,6 +28,7 @@ export class LicitationsService {
   async create(
     createLicitationDto: CreateLicitationDto,
   ): Promise<Licitation> {
+    this.logger.log(`Creating licitation with call number: ${createLicitationDto.callNumber}, internal number: ${createLicitationDto.internalNumber}`);
     const { clientId, productIds, startDate, deadlineDate, ...licitationData } =
       createLicitationDto;
 
@@ -32,6 +36,7 @@ export class LicitationsService {
     const start = new Date(startDate);
     const deadline = new Date(deadlineDate);
     if (deadline <= start) {
+      this.logger.warn(`Invalid dates: deadline ${deadlineDate} is not after start ${startDate}`);
       throw new BadRequestException(
         "Deadline date must be after start date",
       );
@@ -42,11 +47,13 @@ export class LicitationsService {
       where: { id: clientId },
     });
     if (!client) {
+      this.logger.warn(`Client with ID ${clientId} not found`);
       throw new NotFoundException(`Client with ID ${clientId} not found`);
     }
 
     // Validar que los productos existan
     if (productIds.length === 0) {
+      this.logger.warn("No products provided for licitation");
       throw new BadRequestException("At least one product is required");
     }
 
@@ -57,44 +64,64 @@ export class LicitationsService {
     if (products.length !== productIds.length) {
       const foundIds = products.map((p) => p.id);
       const missingIds = productIds.filter((id) => !foundIds.includes(id));
+      this.logger.warn(`Products with IDs ${missingIds.join(", ")} not found`);
       throw new NotFoundException(
         `Products with IDs ${missingIds.join(", ")} not found`,
       );
     }
 
-    // Crear la licitación
-    const licitation = this.licitationRepository.create({
-      ...licitationData,
-      startDate: start,
-      deadlineDate: deadline,
-      client,
-      products,
-      status: createLicitationDto.status || LicitationStatus.PENDING,
-    });
+    try {
+      // Crear la licitación
+      const licitation = this.licitationRepository.create({
+        ...licitationData,
+        startDate: start,
+        deadlineDate: deadline,
+        client,
+        products,
+        status: createLicitationDto.status || LicitationStatus.PENDING,
+      });
 
-    return this.licitationRepository.save(licitation);
+      const savedLicitation = await this.licitationRepository.save(licitation);
+      this.logger.log(`Licitation created successfully with ID: ${savedLicitation.id}, call number: ${savedLicitation.callNumber}`);
+      return savedLicitation;
+    } catch (error) {
+      this.logger.error(`Failed to create licitation with call number: ${createLicitationDto.callNumber}`, error instanceof Error ? error.stack : String(error));
+      throw error;
+    }
   }
 
   async findAll(): Promise<Licitation[]> {
-    return this.licitationRepository.find({
+    this.logger.debug("Finding all licitations");
+    const licitations = await this.licitationRepository.find({
       relations: ["client", "products"],
       order: { createdAt: "DESC" },
     });
+    this.logger.log(`Found ${licitations.length} licitations`);
+    return licitations;
   }
 
   async findOne(id: number): Promise<Licitation | null> {
-    return this.licitationRepository.findOne({
+    this.logger.debug(`Finding licitation with ID: ${id}`);
+    const licitation = await this.licitationRepository.findOne({
       where: { id },
       relations: ["client", "products"],
     });
+    if (!licitation) {
+      this.logger.warn(`Licitation with ID ${id} not found`);
+    } else {
+      this.logger.debug(`Licitation found: ${licitation.callNumber}`);
+    }
+    return licitation;
   }
 
   async update(
     id: number,
     updateLicitationDto: UpdateLicitationDto,
   ): Promise<Licitation> {
+    this.logger.log(`Updating licitation with ID: ${id}`);
     const licitation = await this.findOne(id);
     if (!licitation) {
+      this.logger.warn(`Licitation with ID ${id} not found for update`);
       throw new NotFoundException(`Licitation with ID ${id} not found`);
     }
 
@@ -109,6 +136,7 @@ export class LicitationsService {
         : licitation.deadlineDate;
 
       if (deadline <= start) {
+        this.logger.warn(`Invalid dates: deadline ${deadlineDate || licitation.deadlineDate} is not after start ${startDate || licitation.startDate}`);
         throw new BadRequestException(
           "Deadline date must be after start date",
         );
@@ -124,6 +152,7 @@ export class LicitationsService {
         where: { id: clientId },
       });
       if (!client) {
+        this.logger.warn(`Client with ID ${clientId} not found`);
         throw new NotFoundException(`Client with ID ${clientId} not found`);
       }
       licitation.client = client;
@@ -133,6 +162,7 @@ export class LicitationsService {
     // Actualizar productos si se proporcionan
     if (productIds !== undefined) {
       if (productIds.length === 0) {
+        this.logger.warn("No products provided for licitation update");
         throw new BadRequestException("At least one product is required");
       }
 
@@ -143,6 +173,7 @@ export class LicitationsService {
       if (products.length !== productIds.length) {
         const foundIds = products.map((p) => p.id);
         const missingIds = productIds.filter((id) => !foundIds.includes(id));
+        this.logger.warn(`Products with IDs ${missingIds.join(", ")} not found`);
         throw new NotFoundException(
           `Products with IDs ${missingIds.join(", ")} not found`,
         );
@@ -151,18 +182,33 @@ export class LicitationsService {
       licitation.products = products;
     }
 
-    // Actualizar otros campos
-    Object.assign(licitation, updateData);
-
-    return this.licitationRepository.save(licitation);
+    try {
+      // Actualizar otros campos
+      Object.assign(licitation, updateData);
+      const updatedLicitation = await this.licitationRepository.save(licitation);
+      this.logger.log(`Licitation updated successfully: ID ${id}, call number: ${updatedLicitation.callNumber}`);
+      return updatedLicitation;
+    } catch (error) {
+      this.logger.error(`Failed to update licitation with ID: ${id}`, error instanceof Error ? error.stack : String(error));
+      throw error;
+    }
   }
 
   async remove(id: number): Promise<void> {
+    this.logger.log(`Deleting licitation with ID: ${id}`);
     const licitation = await this.findOne(id);
     if (!licitation) {
+      this.logger.warn(`Licitation with ID ${id} not found for deletion`);
       throw new NotFoundException(`Licitation with ID ${id} not found`);
     }
-    await this.licitationRepository.remove(licitation);
+    
+    try {
+      await this.licitationRepository.remove(licitation);
+      this.logger.log(`Licitation deleted successfully: ID ${id}, call number: ${licitation.callNumber}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete licitation with ID: ${id}`, error instanceof Error ? error.stack : String(error));
+      throw error;
+    }
   }
 }
 
