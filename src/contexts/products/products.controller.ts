@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, ParseIntPipe, NotFoundException, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, ParseIntPipe, Query, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -44,12 +44,7 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Product not found' })
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<Product> {
     this.logger.debug(`GET /products/${id}`);
-    const product = await this.productsService.findOne(id);
-    if (!product) {
-      this.logger.warn(`Product with ID ${id} not found`);
-      throw new NotFoundException(`Product with ID ${id} not found`);
-    }
-    return product;
+    return this.productsService.findOne(id);
   }
 
   @Patch(':id')

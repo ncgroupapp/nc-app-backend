@@ -9,8 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  NotFoundException,
   Query,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -26,6 +26,8 @@ import { Provider } from "./entities/provider.entity";
 @ApiTags("providers")
 @Controller("providers")
 export class ProvidersController {
+  private readonly logger = new Logger(ProvidersController.name);
+
   constructor(private readonly providersService: ProvidersService) {}
 
   @Post()
@@ -36,7 +38,11 @@ export class ProvidersController {
     type: Provider,
   })
   @ApiResponse({ status: 400, description: "Bad request" })
+  @ApiResponse({ status: 409, description: "Provider with RUT already exists" })
   async create(@Body() createProviderDto: CreateProviderDto): Promise<Provider> {
+    this.logger.log(
+      `POST /providers - Creating provider with RUT: ${createProviderDto.rut}`,
+    );
     return this.providersService.create(createProviderDto);
   }
 
@@ -54,6 +60,7 @@ export class ProvidersController {
     type: String,
   })
   async findAll(@Query("rut") rut?: string): Promise<Provider[]> {
+    this.logger.debug(`GET /providers${rut ? `?rut=${rut}` : ""}`);
     if (rut) {
       const provider = await this.providersService.findByRut(rut);
       return provider ? [provider] : [];
@@ -72,11 +79,8 @@ export class ProvidersController {
   async findOne(
     @Param("id", ParseIntPipe) id: number,
   ): Promise<Provider> {
-    const provider = await this.providersService.findOne(id);
-    if (!provider) {
-      throw new NotFoundException(`Provider with ID ${id} not found`);
-    }
-    return provider;
+    this.logger.debug(`GET /providers/${id}`);
+    return this.providersService.findOne(id);
   }
 
   @Patch(":id")
@@ -87,10 +91,12 @@ export class ProvidersController {
     type: Provider,
   })
   @ApiResponse({ status: 404, description: "Provider not found" })
+  @ApiResponse({ status: 409, description: "Provider with RUT already exists" })
   async update(
     @Param("id", ParseIntPipe) id: number,
     @Body() updateProviderDto: UpdateProviderDto,
   ): Promise<Provider> {
+    this.logger.log(`PATCH /providers/${id} - Updating provider`);
     return this.providersService.update(id, updateProviderDto);
   }
 
@@ -103,6 +109,7 @@ export class ProvidersController {
   })
   @ApiResponse({ status: 404, description: "Provider not found" })
   async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
+    this.logger.log(`DELETE /providers/${id} - Deleting provider`);
     await this.providersService.remove(id);
   }
 }

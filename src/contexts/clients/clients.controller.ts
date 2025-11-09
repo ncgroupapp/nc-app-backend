@@ -9,7 +9,6 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  NotFoundException,
   Query,
   Logger,
 } from "@nestjs/common";
@@ -79,12 +78,7 @@ export class ClientsController {
     @Param("id", ParseIntPipe) id: number,
   ): Promise<Client> {
     this.logger.debug(`GET /clients/${id}`);
-    const client = await this.clientsService.findOne(id);
-    if (!client) {
-      this.logger.warn(`Client with ID ${id} not found`);
-      throw new NotFoundException(`Client with ID ${id} not found`);
-    }
-    return client;
+    return this.clientsService.findOne(id);
   }
 
   @Patch(":id")
