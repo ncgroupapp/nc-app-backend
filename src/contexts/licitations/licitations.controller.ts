@@ -9,7 +9,6 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  NotFoundException,
   Logger,
 } from "@nestjs/common";
 import {
@@ -67,12 +66,7 @@ export class LicitationsController {
   @ApiResponse({ status: 404, description: "Licitation not found" })
   async findOne(@Param("id", ParseIntPipe) id: number): Promise<Licitation> {
     this.logger.debug(`GET /licitations/${id}`);
-    const licitation = await this.licitationsService.findOne(id);
-    if (!licitation) {
-      this.logger.warn(`Licitation with ID ${id} not found`);
-      throw new NotFoundException(`Licitation with ID ${id} not found`);
-    }
-    return licitation;
+    return this.licitationsService.findOne(id);
   }
 
   @Patch(":id")
