@@ -21,10 +21,15 @@ export class ProvidersService {
 
   async create(createProviderDto: CreateProviderDto): Promise<Provider> {
     this.logger.log(`Creating provider with RUT: ${createProviderDto.rut}`);
-    await this.validateRutNotExists(createProviderDto.rut);
+    
+    const normalizedRut = this.normalizeRut(createProviderDto.rut);
+    await this.validateRutNotExists(normalizedRut);
 
     try {
-      const provider = this.providerRepository.create(createProviderDto);
+      const provider = this.providerRepository.create({
+        ...createProviderDto,
+        rut: normalizedRut,
+      });
       const savedProvider = await this.providerRepository.save(provider);
       this.logger.log(
         `Provider created successfully with ID: ${savedProvider.id}, RUT: ${savedProvider.rut}`,
@@ -74,7 +79,9 @@ export class ProvidersService {
     const provider = await this.findOne(id);
 
     if (updateProviderDto.rut && updateProviderDto.rut !== provider.rut) {
-      await this.validateRutNotExists(updateProviderDto.rut);
+      const normalizedRut = this.normalizeRut(updateProviderDto.rut);
+      await this.validateRutNotExists(normalizedRut);
+      updateProviderDto.rut = normalizedRut;
     }
 
     try {
@@ -119,6 +126,23 @@ export class ProvidersService {
         `Provider with RUT ${rut} already exists. Please use a different RUT.`,
       );
     }
+  }
+
+  /**
+   * Normaliza el RUT uruguayo a formato estándar (XXXXXXXX-X)
+   * Remueve puntos y espacios, mantiene el guion y el dígito verificador
+   */
+  private normalizeRut(rut: string): string {
+    const cleanRut = rut.trim().toUpperCase().replace(/\./g, "").replace(/\s/g, "");
+
+    if (!cleanRut.includes("-")) {
+      const numberPart = cleanRut.slice(0, -1);
+      const checkDigit = cleanRut.slice(-1);
+      return `${numberPart.padStart(8, "0")}-${checkDigit}`;
+    }
+
+    const [numberPart, checkDigit] = cleanRut.split("-");
+    return `${numberPart.padStart(8, "0")}-${checkDigit}`;
   }
 }
 
