@@ -11,6 +11,7 @@ import { ProductsModule } from "../contexts/products/products.module";
 import { ProvidersModule } from "../contexts/providers/providers.module";
 import { ClientsModule } from "../contexts/clients/clients.module";
 import { OffersModule } from "../contexts/offers/offers.module";
+import { QuotationModule } from "../contexts/quotation/quotation.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { OffersModule } from "../contexts/offers/offers.module";
     ProvidersModule,
     ClientsModule,
     OffersModule,
+    QuotationModule,
   ],
 })
 export class AppModule {}
