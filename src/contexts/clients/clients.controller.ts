@@ -9,8 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  NotFoundException,
   Query,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -26,6 +26,8 @@ import { Client } from "./entities/client.entity";
 @ApiTags("clients")
 @Controller("clients")
 export class ClientsController {
+  private readonly logger = new Logger(ClientsController.name);
+
   constructor(private readonly clientsService: ClientsService) {}
 
   @Post()
@@ -38,6 +40,7 @@ export class ClientsController {
   @ApiResponse({ status: 400, description: "Bad request" })
   @ApiResponse({ status: 409, description: "Client with identifier already exists" })
   async create(@Body() createClientDto: CreateClientDto): Promise<Client> {
+    this.logger.log(`POST /clients - Creating client with identifier: ${createClientDto.identifier}`);
     return this.clientsService.create(createClientDto);
   }
 
@@ -55,6 +58,7 @@ export class ClientsController {
     type: String,
   })
   async findAll(@Query("identifier") identifier?: string): Promise<Client[]> {
+    this.logger.debug(`GET /clients${identifier ? `?identifier=${identifier}` : ''}`);
     if (identifier) {
       const client = await this.clientsService.findByIdentifier(identifier);
       return client ? [client] : [];
@@ -73,11 +77,8 @@ export class ClientsController {
   async findOne(
     @Param("id", ParseIntPipe) id: number,
   ): Promise<Client> {
-    const client = await this.clientsService.findOne(id);
-    if (!client) {
-      throw new NotFoundException(`Client with ID ${id} not found`);
-    }
-    return client;
+    this.logger.debug(`GET /clients/${id}`);
+    return this.clientsService.findOne(id);
   }
 
   @Patch(":id")
@@ -93,6 +94,7 @@ export class ClientsController {
     @Param("id", ParseIntPipe) id: number,
     @Body() updateClientDto: UpdateClientDto,
   ): Promise<Client> {
+    this.logger.log(`PATCH /clients/${id} - Updating client`);
     return this.clientsService.update(id, updateClientDto);
   }
 
@@ -105,6 +107,7 @@ export class ClientsController {
   })
   @ApiResponse({ status: 404, description: "Client not found" })
   async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
+    this.logger.log(`DELETE /clients/${id} - Deleting client`);
     await this.clientsService.remove(id);
   }
 }

@@ -9,8 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
-  NotFoundException,
   Query,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -26,6 +26,8 @@ import { Offer } from "./entities/offer.entity";
 @ApiTags("offers")
 @Controller("offers")
 export class OffersController {
+  private readonly logger = new Logger(OffersController.name);
+
   constructor(private readonly offersService: OffersService) {}
 
   @Post()
@@ -38,6 +40,9 @@ export class OffersController {
   @ApiResponse({ status: 400, description: "Bad request" })
   @ApiResponse({ status: 404, description: "Product or Provider not found" })
   async create(@Body() createOfferDto: CreateOfferDto): Promise<Offer> {
+    this.logger.log(
+      `POST /offers - Creating offer for product ID: ${createOfferDto.productId}`,
+    );
     return this.offersService.create(createOfferDto);
   }
 
@@ -57,6 +62,9 @@ export class OffersController {
   async findAll(
     @Query("productId") productId?: string,
   ): Promise<Offer[]> {
+    this.logger.debug(
+      `GET /offers${productId ? `?productId=${productId}` : ""}`,
+    );
     const productIdNum = productId
       ? parseInt(productId, 10)
       : undefined;
@@ -74,11 +82,8 @@ export class OffersController {
   async findOne(
     @Param("id", ParseIntPipe) id: number,
   ): Promise<Offer> {
-    const offer = await this.offersService.findOne(id);
-    if (!offer) {
-      throw new NotFoundException(`Offer with ID ${id} not found`);
-    }
-    return offer;
+    this.logger.debug(`GET /offers/${id}`);
+    return this.offersService.findOne(id);
   }
 
   @Patch(":id")
@@ -93,6 +98,7 @@ export class OffersController {
     @Param("id", ParseIntPipe) id: number,
     @Body() updateOfferDto: UpdateOfferDto,
   ): Promise<Offer> {
+    this.logger.log(`PATCH /offers/${id} - Updating offer`);
     return this.offersService.update(id, updateOfferDto);
   }
 
@@ -105,6 +111,7 @@ export class OffersController {
   })
   @ApiResponse({ status: 404, description: "Offer not found" })
   async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
+    this.logger.log(`DELETE /offers/${id} - Deleting offer`);
     await this.offersService.remove(id);
   }
 }

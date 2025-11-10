@@ -9,6 +9,7 @@ import {
   ArrayMinSize,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { IsUruguayRut } from "@/contexts/shared/validators/is-uruguay-rut.validator";
 
 export class ContactDto {
   @ApiProperty({ description: "Contact name", example: "Juan Pérez" })
@@ -23,7 +24,7 @@ export class ContactDto {
 
   @ApiProperty({
     description: "Contact phone",
-    example: "+56 9 1234 5678",
+    example: "+598 99 123 456",
     required: false,
   })
   @IsString()
@@ -32,7 +33,7 @@ export class ContactDto {
 
   @ApiProperty({
     description: "Contact address",
-    example: "Av. Principal 123, Santiago",
+    example: "Av. 18 de Julio 1234, Montevideo",
     required: false,
   })
   @IsString()
@@ -42,11 +43,12 @@ export class ContactDto {
 
 export class CreateProviderDto {
   @ApiProperty({
-    description: "Provider RUT",
-    example: "12.345.678-9",
+    description: "Provider RUT (Uruguayan format: XXXXXXXX-X)",
+    example: "12345678-6",
   })
   @IsString()
   @IsNotEmpty()
+  @IsUruguayRut({ message: "RUT must be a valid Uruguayan RUT format (XXXXXXXX-X) with valid check digit" })
   rut!: string;
 
   @ApiProperty({
@@ -59,7 +61,7 @@ export class CreateProviderDto {
 
   @ApiProperty({
     description: "Provider country",
-    example: "Chile",
+    example: "Uruguay",
   })
   @IsString()
   @IsNotEmpty()

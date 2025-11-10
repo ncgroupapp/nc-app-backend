@@ -1,6 +1,7 @@
 import {
   Injectable,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -12,6 +13,8 @@ import { Provider } from "@/contexts/providers/entities/provider.entity";
 
 @Injectable()
 export class OffersService {
+  private readonly logger = new Logger(OffersService.name);
+
   constructor(
     @InjectRepository(Offer)
     private readonly offerRepository: Repository<Offer>,
@@ -22,25 +25,162 @@ export class OffersService {
   ) {}
 
   async create(createOfferDto: CreateOfferDto): Promise<Offer> {
+    this.logger.log(
+      `Creating offer for product ID: ${createOfferDto.productId}, provider ID: ${createOfferDto.providerId}`,
+    );
+
+    const product = await this.validateProductExists(createOfferDto.productId);
+    const provider = await this.validateProviderExists(
+      createOfferDto.providerId,
+    );
+
+    try {
+      const offer = this.buildOfferEntity(
+        createOfferDto,
+        product,
+        provider,
+      );
+
+      const savedOffer = await this.offerRepository.save(offer);
+      this.logger.log(
+        `Offer created successfully with ID: ${savedOffer.id}, name: ${savedOffer.name}`,
+      );
+      return savedOffer;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create offer for product ID: ${createOfferDto.productId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async findAll(productId?: number): Promise<Offer[]> {
+    this.logger.debug(
+      `Finding all offers${productId ? ` for product ID: ${productId}` : ""}`,
+    );
+    const where = productId ? { productId } : {};
+    const offers = await this.offerRepository.find({
+      where,
+      relations: ["product", "provider"],
+      order: { createdAt: "DESC" },
+    });
+    this.logger.log(`Found ${offers.length} offers`);
+    return offers;
+  }
+
+  async findOne(id: number): Promise<Offer> {
+    this.logger.debug(`Finding offer with ID: ${id}`);
+    const offer = await this.offerRepository.findOne({
+      where: { id },
+      relations: ["product", "provider"],
+    });
+    if (!offer) {
+      this.logger.warn(`Offer with ID ${id} not found`);
+      throw new NotFoundException(
+        `Offer with ID ${id} not found. Please verify the ID and try again.`,
+      );
+    }
+    this.logger.debug(`Offer found: ${offer.name}`);
+    return offer;
+  }
+
+  async findByProduct(productId: number): Promise<Offer[]> {
+    this.logger.debug(`Finding offers for product ID: ${productId}`);
+    const offers = await this.offerRepository.find({
+      where: { productId },
+      relations: ["product", "provider"],
+      order: { createdAt: "DESC" },
+    });
+    this.logger.log(`Found ${offers.length} offers for product ${productId}`);
+    return offers;
+  }
+
+  async update(
+    id: number,
+    updateOfferDto: UpdateOfferDto,
+  ): Promise<Offer> {
+    this.logger.log(`Updating offer with ID: ${id}`);
+    const offer = await this.findOne(id);
+
+    const { productId, providerId, deliveryDate, ...fieldsToUpdate } =
+      updateOfferDto;
+
+    await this.updateOfferRelations(offer, productId, providerId);
+
+    this.updateOfferFields(offer, fieldsToUpdate);
+
+    if (deliveryDate) {
+      offer.deliveryDate = new Date(deliveryDate);
+    }
+
+    try {
+      const updatedOffer = await this.offerRepository.save(offer);
+      this.logger.log(
+        `Offer updated successfully: ID ${id}, name: ${updatedOffer.name}`,
+      );
+      return updatedOffer;
+    } catch (error) {
+      this.logger.error(
+        `Failed to update offer with ID: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async remove(id: number): Promise<void> {
+    this.logger.log(`Deleting offer with ID: ${id}`);
+    const offer = await this.findOne(id);
+
+    try {
+      await this.offerRepository.remove(offer);
+      this.logger.log(
+        `Offer deleted successfully: ID ${id}, name: ${offer.name}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete offer with ID: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  private async validateProductExists(productId: number): Promise<Product> {
     const product = await this.productRepository.findOne({
-      where: { id: createOfferDto.productId },
+      where: { id: productId },
     });
     if (!product) {
+      this.logger.warn(`Product with ID ${productId} not found`);
       throw new NotFoundException(
-        `Product with ID ${createOfferDto.productId} not found`,
+        `Product with ID ${productId} not found. Please verify the product ID and try again.`,
       );
     }
+    return product;
+  }
 
+  private async validateProviderExists(
+    providerId: number,
+  ): Promise<Provider> {
     const provider = await this.providerRepository.findOne({
-      where: { id: createOfferDto.providerId },
+      where: { id: providerId },
     });
     if (!provider) {
+      this.logger.warn(`Provider with ID ${providerId} not found`);
       throw new NotFoundException(
-        `Provider with ID ${createOfferDto.providerId} not found`,
+        `Provider with ID ${providerId} not found. Please verify the provider ID and try again.`,
       );
     }
+    return provider;
+  }
 
-    const offer = this.offerRepository.create({
+  private buildOfferEntity(
+    createOfferDto: CreateOfferDto,
+    product: Product,
+    provider: Provider,
+  ): Offer {
+    return this.offerRepository.create({
       name: createOfferDto.name,
       price: createOfferDto.price,
       deliveryDate: new Date(createOfferDto.deliveryDate),
@@ -48,88 +188,29 @@ export class OffersService {
       product,
       provider,
     });
-
-    return this.offerRepository.save(offer);
   }
 
-  async findAll(productId?: number): Promise<Offer[]> {
-    const where = productId ? { productId } : {};
-    return this.offerRepository.find({
-      where,
-      relations: ["product", "provider"],
-      order: { createdAt: "DESC" },
-    });
+  private updateOfferFields(
+    offer: Offer,
+    fieldsToUpdate: Omit<UpdateOfferDto, "productId" | "providerId" | "deliveryDate">,
+  ): void {
+    Object.assign(offer, fieldsToUpdate);
   }
 
-  async findOne(id: number): Promise<Offer | null> {
-    return this.offerRepository.findOne({
-      where: { id },
-      relations: ["product", "provider"],
-    });
-  }
-
-  async findByProduct(productId: number): Promise<Offer[]> {
-    return this.offerRepository.find({
-      where: { productId },
-      relations: ["product", "provider"],
-      order: { createdAt: "DESC" },
-    });
-  }
-
-  async update(
-    id: number,
-    updateOfferDto: UpdateOfferDto,
-  ): Promise<Offer> {
-    const offer = await this.findOne(id);
-    if (!offer) {
-      throw new NotFoundException(`Offer with ID ${id} not found`);
-    }
-
-    if (updateOfferDto.productId) {
-      const product = await this.productRepository.findOne({
-        where: { id: updateOfferDto.productId },
-      });
-      if (!product) {
-        throw new NotFoundException(
-          `Product with ID ${updateOfferDto.productId} not found`,
-        );
-      }
+  private async updateOfferRelations(
+    offer: Offer,
+    productId?: number,
+    providerId?: number,
+  ): Promise<void> {
+    if (productId) {
+      const product = await this.validateProductExists(productId);
       offer.product = product;
     }
 
-    if (updateOfferDto.providerId) {
-      const provider = await this.providerRepository.findOne({
-        where: { id: updateOfferDto.providerId },
-      });
-      if (!provider) {
-        throw new NotFoundException(
-          `Provider with ID ${updateOfferDto.providerId} not found`,
-        );
-      }
+    if (providerId) {
+      const provider = await this.validateProviderExists(providerId);
       offer.provider = provider;
     }
-
-    if (updateOfferDto.name !== undefined) {
-      offer.name = updateOfferDto.name;
-    }
-    if (updateOfferDto.price !== undefined) {
-      offer.price = updateOfferDto.price;
-    }
-    if (updateOfferDto.deliveryDate) {
-      offer.deliveryDate = new Date(updateOfferDto.deliveryDate);
-    }
-    if (updateOfferDto.quantity !== undefined) {
-      offer.quantity = updateOfferDto.quantity;
-    }
-    return this.offerRepository.save(offer);
-  }
-
-  async remove(id: number): Promise<void> {
-    const offer = await this.findOne(id);
-    if (!offer) {
-      throw new NotFoundException(`Offer with ID ${id} not found`);
-    }
-    await this.offerRepository.remove(offer);
   }
 }
 

@@ -23,7 +23,7 @@ export class ContactDto {
 
   @ApiProperty({
     description: "Contact phone",
-    example: "+56 9 1234 5678",
+    example: "+598 99 123 456",
     required: false,
   })
   @IsString()
@@ -32,7 +32,7 @@ export class ContactDto {
 
   @ApiProperty({
     description: "Contact address",
-    example: "Av. Principal 123, Santiago",
+    example: "Av. 18 de Julio 1234, Montevideo",
     required: false,
   })
   @IsString()
@@ -51,7 +51,7 @@ export class CreateClientDto {
 
   @ApiProperty({
     description: "Client identifier/RUT",
-    example: "12.345.678-9",
+    example: "12345678-6",
   })
   @IsString()
   @IsNotEmpty()
@@ -64,8 +64,8 @@ export class CreateClientDto {
       {
         name: "María González",
         email: "maria@example.com",
-        phone: "+56 9 9876 5432",
-        address: "Av. Empresa 456, Santiago",
+        phone: "+598 99 123 456",
+        address: "Av. 18 de Julio 1234, Montevideo",
       },
     ],
   })
