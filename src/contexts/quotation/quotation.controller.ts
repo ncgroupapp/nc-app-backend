@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,14 +19,19 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import type { FastifyReply } from 'fastify';
 import { QuotationService } from './quotation.service';
+import { QuotationPdfService } from './quotation-pdf.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
 
 @ApiTags("quotations")
 @Controller("quotation")
 export class QuotationController {
-  constructor(private readonly quotationService: QuotationService) {}
+  constructor(
+    private readonly quotationService: QuotationService,
+    private readonly quotationPdfService: QuotationPdfService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: "Crear una nueva cotización" })
@@ -153,5 +160,69 @@ export class QuotationController {
   })
   remove(@Param("id") id: string) {
     return this.quotationService.remove(+id);
+  }
+
+  @Get(":id/pdf/preview")
+  @ApiOperation({ summary: "Obtener preview del PDF de la cotización en base64" })
+  @ApiParam({ name: "id", description: "ID de la cotización" })
+  @ApiResponse({
+    status: 200,
+    description: "Preview del PDF generado exitosamente (base64)",
+    schema: {
+      type: "object",
+      properties: {
+        pdfBase64: { type: "string" },
+        quotationId: { type: "number" },
+        quotationIdentifier: { type: "string" },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Cotización no encontrada",
+  })
+  async getPdfPreview(@Param("id") id: string) {
+    const quotation = await this.quotationService.findOne(+id);
+    const pdfBase64 = await this.quotationPdfService.generatePdfBase64(quotation);
+    
+    return {
+      pdfBase64,
+      quotationId: quotation.id,
+      quotationIdentifier: quotation.quotationIdentifier,
+    };
+  }
+
+  @Get(":id/pdf/download")
+  @ApiOperation({ summary: "Descargar PDF de la cotización" })
+  @ApiParam({ name: "id", description: "ID de la cotización" })
+  @ApiResponse({
+    status: 200,
+    description: "PDF descargado exitosamente",
+    content: {
+      "application/pdf": {
+        schema: {
+          type: "string",
+          format: "binary",
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Cotización no encontrada",
+  })
+  async downloadPdf(
+    @Param("id") id: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const quotation = await this.quotationService.findOne(+id);
+    const pdfBuffer = await this.quotationPdfService.generatePdf(quotation);
+    
+    const filename = `cotizacion_${quotation.quotationIdentifier}_${new Date().toISOString().split('T')[0]}.pdf`;
+    
+    reply.header("Content-Type", "application/pdf");
+    reply.header("Content-Disposition", `attachment; filename="${filename}"`);
+    
+    return new StreamableFile(pdfBuffer);
   }
 }

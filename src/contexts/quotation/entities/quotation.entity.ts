@@ -73,6 +73,12 @@ export class Quotation {
   @Column({ type: 'varchar', length: 255, nullable: true })
   clientName?: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  paymentForm?: string; // Forma de Pago (e.g., "30 días")
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  validity?: string; // Validez (e.g., "30 días")
+
   @CreateDateColumn()
   createdAt!: Date;
 

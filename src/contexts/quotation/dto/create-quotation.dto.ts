@@ -145,4 +145,14 @@ export class CreateQuotationDto {
   @IsOptional()
   @IsString()
   clientName?: string;
+
+  @ApiPropertyOptional({ description: 'Forma de pago (ej: "30 días")' })
+  @IsOptional()
+  @IsString()
+  paymentForm?: string;
+
+  @ApiPropertyOptional({ description: 'Validez de la cotización (ej: "30 días")' })
+  @IsOptional()
+  @IsString()
+  validity?: string;
 }

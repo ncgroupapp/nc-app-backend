@@ -41,6 +41,8 @@ export class QuotationService {
         : undefined,
       clientId: createQuotationDto.clientId,
       clientName: createQuotationDto.clientName,
+      paymentForm: createQuotationDto.paymentForm,
+      validity: createQuotationDto.validity,
       items: createQuotationDto.items.map((item) =>
         this.quotationItemRepository.create(item),
       ),
