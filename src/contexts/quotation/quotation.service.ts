@@ -3,7 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
-import { Quotation, QuotationItem } from './entities/quotation.entity';
+import { Quotation, QuotationItem, QuotationStatus } from './entities/quotation.entity';
+import { AdjudicationsService } from '@/contexts/adjudications/adjudications.service';
+import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudication.entity';
 
 @Injectable()
 export class QuotationService {
@@ -12,6 +14,7 @@ export class QuotationService {
     private readonly quotationRepository: Repository<Quotation>,
     @InjectRepository(QuotationItem)
     private readonly quotationItemRepository: Repository<QuotationItem>,
+    private readonly adjudicationsService: AdjudicationsService,
   ) {}
 
   async create(createQuotationDto: CreateQuotationDto): Promise<Quotation> {
@@ -132,7 +135,49 @@ export class QuotationService {
         : quotation.validUntil,
     });
 
-    return await this.quotationRepository.save(quotation);
+    const savedQuotation = await this.quotationRepository.save(quotation);
+
+    // Check if status changed to FINALIZED and trigger adjudication if needed
+    // Note: This logic assumes that "Finalized" means we are ready to adjudicate.
+    // However, usually adjudication happens AFTER the quotation is sent and accepted.
+    // The requirements say: "Manejo del resultado de la adjudicación... Administrador accede a la cotización... Cambia estado de productos... Se crea una adjudicación"
+    // So maybe we need a specific method to "Adjudicate" or check if items are awarded.
+    
+    // Let's add a check: if the quotation is finalized AND has awarded items, create adjudication.
+    // Or maybe we should expose a separate method `createAdjudicationFromQuotation`.
+    // For now, let's hook it here if the status becomes FINALIZED.
+    
+    if (savedQuotation.status === QuotationStatus.FINALIZED) {
+        // Filter awarded items
+        const awardedItems = savedQuotation.items.filter(item => item.awardStatus === 'adjudicado'); // Using string literal as enum might be tricky to import if circular, but we have it.
+        
+        if (awardedItems.length > 0) {
+            // Determine if total or partial
+            const isTotal = awardedItems.length === savedQuotation.items.length;
+            
+            // TODO: To implement automatic adjudication, we need:
+            // 1. The Licitation ID (currently not directly linked in Quotation entity)
+            // 2. Mapping of Quotation Items to Adjudication Items (including unit prices)
+            // 3. A decision on whether this should be automatic or manual.
+            // For now, we rely on the manual creation via AdjudicationsController.
+            
+            /*
+            await this.adjudicationsService.create({
+                quotationId: savedQuotation.id,
+                licitationId: 1, 
+                status: isTotal ? AdjudicationStatus.TOTAL : AdjudicationStatus.PARTIAL,
+                items: awardedItems.map(item => ({
+                    sku: item.sku,
+                    quantity: item.quantity,
+                    unitPrice: Number(item.priceWithoutIVA), // Assuming base price
+                    productId: item.productId
+                }))
+            });
+            */
+        }
+    }
+
+    return savedQuotation;
   }
 
   async remove(id: number): Promise<void> {

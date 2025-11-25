@@ -13,6 +13,8 @@ import { ClientsModule } from "../contexts/clients/clients.module";
 import { OffersModule } from "../contexts/offers/offers.module";
 import { QuotationModule } from "../contexts/quotation/quotation.module";
 import { LicitationsModule } from "../contexts/licitations/licitations.module";
+import { AdjudicationsModule } from "../contexts/adjudications/adjudications.module";
+import { DeliveriesModule } from "../contexts/deliveries/deliveries.module";
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { LicitationsModule } from "../contexts/licitations/licitations.module";
     OffersModule,
     QuotationModule,
     LicitationsModule,
+    AdjudicationsModule,
+    DeliveriesModule,
   ],
 })
 export class AppModule {}
