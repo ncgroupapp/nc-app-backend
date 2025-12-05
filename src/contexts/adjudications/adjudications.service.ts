@@ -137,7 +137,7 @@ export class AdjudicationsService {
     let totalPriceWithoutIVA = 0;
     let totalQuantity = 0;
 
-    allItems.forEach(item => {
+    allItems.forEach((item: any) => {
       totalQuantity += item.quantity;
       totalPriceWithoutIVA += Number(item.unitPrice) * item.quantity;
     });
