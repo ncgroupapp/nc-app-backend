@@ -1,8 +1,10 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiQuery } from '@nestjs/swagger';
 import { ImportsService } from './imports.service';
 import { CreateImportDto } from './dto/create-import.dto';
 import { UpdateImportDto } from './dto/update-import.dto';
 
+@ApiTags('imports')
 @Controller('imports')
 export class ImportsController {
   constructor(private readonly importsService: ImportsService) {}
@@ -13,6 +15,10 @@ export class ImportsController {
   }
 
   @Get()
+  @ApiQuery({ name: 'status', required: false })
+  @ApiQuery({ name: 'providerId', required: false, type: Number })
+  @ApiQuery({ name: 'fromDate', required: false })
+  @ApiQuery({ name: 'toDate', required: false })
   findAll(
     @Query('status') status?: string,
     @Query('providerId') providerId?: number,
