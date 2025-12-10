@@ -103,10 +103,9 @@ export class OffersController {
   }
 
   @Delete(":id")
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete an offer" })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: "Offer deleted successfully",
   })
   @ApiResponse({ status: 404, description: "Offer not found" })

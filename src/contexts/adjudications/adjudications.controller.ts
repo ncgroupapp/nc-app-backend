@@ -123,11 +123,10 @@ export class AdjudicationsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar adjudicación' })
   @ApiParam({ name: 'id', description: 'ID de la adjudicación' })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: 'Adjudicación eliminada exitosamente',
   })
   @ApiResponse({

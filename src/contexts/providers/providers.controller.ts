@@ -101,10 +101,9 @@ export class ProvidersController {
   }
 
   @Delete(":id")
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a provider" })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: "Provider deleted successfully",
   })
   @ApiResponse({ status: 404, description: "Provider not found" })
