@@ -2,14 +2,9 @@ import { IsNumber, IsOptional, IsString, IsPositive } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AddAdjudicationItemDto {
-  @ApiPropertyOptional({ description: 'ID del producto (si existe en el sistema)' })
-  @IsOptional()
+  @ApiProperty({ description: 'ID del producto' })
   @IsNumber()
-  productId?: number;
-
-  @ApiProperty({ description: 'SKU o Parte Número del producto' })
-  @IsString()
-  sku!: string;
+  productId!: number;
 
   @ApiProperty({ description: 'Cantidad adjudicada' })
   @IsNumber()

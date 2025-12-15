@@ -20,18 +20,9 @@ import {
 } from '../entities/quotation.entity';
 
 export class CreateQuotationItemDto {
-  @ApiPropertyOptional({ description: 'ID del producto (si existe en el sistema)' })
-  @IsOptional()
+  @ApiProperty({ description: 'ID del producto' })
   @IsNumber()
-  productId?: number;
-
-  @ApiProperty({ description: 'Nombre del producto' })
-  @IsString()
-  productName!: string;
-
-  @ApiProperty({ description: 'SKU o Parte Número del producto' })
-  @IsString()
-  sku!: string;
+  productId!: number;
 
   @ApiPropertyOptional({ description: 'ID del proveedor (si existe en el sistema)' })
   @IsOptional()
@@ -93,11 +84,11 @@ export class CreateQuotationItemDto {
 }
 
 export class CreateQuotationDto {
-  @ApiProperty({ description: 'Identificador único de la cotización' })
+  @ApiProperty({ description: 'Identificador único de la cotización', example: 'COT-2024-001' })
   @IsString()
   quotationIdentifier!: string;
 
-  @ApiPropertyOptional({ description: 'Compra asociada' })
+  @ApiPropertyOptional({ description: 'Compra asociada', example: 'Licitación 5544-LP-24' })
   @IsOptional()
   @IsString()
   associatedPurchase?: string;
@@ -110,12 +101,12 @@ export class CreateQuotationDto {
   @IsEnum(QuotationStatus)
   status!: QuotationStatus;
 
-  @ApiPropertyOptional({ description: 'Descripción de la cotización' })
+  @ApiPropertyOptional({ description: 'Descripción de la cotización', example: 'Cotización de equipos informáticos' })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Observaciones generales' })
+  @ApiPropertyOptional({ description: 'Observaciones generales', example: 'Entrega en bodega central' })
   @IsOptional()
   @IsString()
   observations?: string;
@@ -126,32 +117,36 @@ export class CreateQuotationDto {
   @Type(() => CreateQuotationItemDto)
   items!: CreateQuotationItemDto[];
 
-  @ApiPropertyOptional({ description: 'Fecha de la cotización' })
+  @ApiPropertyOptional({ description: 'Fecha de la cotización', example: '2024-11-25T10:00:00Z' })
   @IsOptional()
   @IsDateString()
   quotationDate?: string;
 
-  @ApiPropertyOptional({ description: 'Fecha de validez de la cotización' })
+  @ApiPropertyOptional({ description: 'Fecha de validez de la cotización', example: '2024-12-10T23:59:59Z' })
   @IsOptional()
   @IsDateString()
   validUntil?: string;
 
-  @ApiPropertyOptional({ description: 'ID del cliente' })
+  @ApiPropertyOptional({ description: 'ID del cliente', example: 1 })
   @IsOptional()
   @IsNumber()
   clientId?: number;
 
-  @ApiPropertyOptional({ description: 'Nombre del cliente' })
+  @ApiProperty({ description: 'ID de la licitación asociada', example: 1 })
+  @IsNumber()
+  licitationId!: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del cliente', example: 'Empresa Cliente SpA' })
   @IsOptional()
   @IsString()
   clientName?: string;
 
-  @ApiPropertyOptional({ description: 'Forma de pago (ej: "30 días")' })
+  @ApiPropertyOptional({ description: 'Forma de pago (ej: "30 días")', example: '30 días' })
   @IsOptional()
   @IsString()
   paymentForm?: string;
 
-  @ApiPropertyOptional({ description: 'Validez de la cotización (ej: "30 días")' })
+  @ApiPropertyOptional({ description: 'Validez de la cotización (ej: "30 días")', example: '15 días' })
   @IsOptional()
   @IsString()
   validity?: string;

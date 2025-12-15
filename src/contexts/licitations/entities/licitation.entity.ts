@@ -8,9 +8,11 @@ import {
   ManyToMany,
   JoinColumn,
   JoinTable,
+  OneToMany,
 } from "typeorm";
 import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
+import { Quotation } from "@/contexts/quotation/entities/quotation.entity";
 
 export enum LicitationStatus {
   PENDING = "Pending",
@@ -50,6 +52,9 @@ export class Licitation {
     inverseJoinColumn: { name: "productId", referencedColumnName: "id" },
   })
   products?: Product[];
+
+  @OneToMany(() => Quotation, (quotation) => quotation.licitation)
+  quotations?: Quotation[];
 
   @Column({
     type: "enum",

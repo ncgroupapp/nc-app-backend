@@ -4,8 +4,9 @@ import { Repository } from 'typeorm';
 import { Adjudication, AdjudicationStatus, AdjudicationItem } from './entities/adjudication.entity';
 import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
 import { DeliveriesService } from '@/contexts/deliveries/deliveries.service';
-import { Quotation } from '@/contexts/quotation/entities/quotation.entity';
+import { Quotation, QuotationItem, QuotationAwardStatus } from '@/contexts/quotation/entities/quotation.entity';
 import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
+import { Product } from '@/contexts/products/entities/product.entity';
 
 @Injectable()
 export class AdjudicationsService {
@@ -18,6 +19,10 @@ export class AdjudicationsService {
     private readonly quotationRepository: Repository<Quotation>,
     @InjectRepository(Licitation)
     private readonly licitationRepository: Repository<Licitation>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+    @InjectRepository(QuotationItem)
+    private readonly quotationItemRepository: Repository<QuotationItem>,
     private readonly deliveriesService: DeliveriesService,
   ) {}
 
@@ -49,11 +54,69 @@ export class AdjudicationsService {
     let totalPriceWithIVA = 0; 
     let totalQuantity = 0;
 
-    const items = createAdjudicationDto.items.map(itemDto => {
+    const items = await Promise.all(createAdjudicationDto.items.map(async (itemDto) => {
       totalQuantity += itemDto.quantity;
       totalPriceWithoutIVA += itemDto.unitPrice * itemDto.quantity;
+
+      // Update Quotation Item Status to AWARDED
+      const quotationItem = await this.quotationItemRepository.findOne({
+        where: { 
+          quotationId: createAdjudicationDto.quotationId,
+
+          productId: itemDto.productId 
+        }
+      });
+
+      if (quotationItem) {
+        quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
+        await this.quotationItemRepository.save(quotationItem);
+      }
+
+      // Update Product Stock
+      const product = await this.productRepository.findOne({ where: { id: itemDto.productId } });
+      if (product) {
+        product.stockQuantity = (product.stockQuantity || 0) - itemDto.quantity;
+        await this.productRepository.save(product);
+      }
+
       return this.adjudicationItemRepository.create(itemDto);
-    });
+    }));
+
+    // Process Non-Awarded Items
+    if (createAdjudicationDto.nonAwardedItems) {
+      await Promise.all(createAdjudicationDto.nonAwardedItems.map(async (itemDto) => {
+        // Update Quotation Item Status to NOT_AWARDED
+        const quotationItem = await this.quotationItemRepository.findOne({
+          where: { 
+            quotationId: createAdjudicationDto.quotationId,
+
+            productId: itemDto.productId 
+          }
+        });
+
+        if (quotationItem) {
+          quotationItem.awardStatus = QuotationAwardStatus.NOT_AWARDED;
+          await this.quotationItemRepository.save(quotationItem);
+        }
+
+        // Update Product History (Winner Info)
+        const product = await this.productRepository.findOne({ where: { id: itemDto.productId } });
+        if (product) {
+          const historyEntry = {
+            date: new Date(),
+            licitationId: createAdjudicationDto.licitationId,
+            competitorName: itemDto.competitorName,
+            competitorRut: itemDto.competitorRut,
+            competitorPrice: itemDto.competitorPrice,
+            competitorBrand: itemDto.competitorBrand,
+          };
+          
+          const currentHistory = product.adjudicationHistory || [];
+          product.adjudicationHistory = [...currentHistory, historyEntry];
+          await this.productRepository.save(product);
+        }
+      }));
+    }
     
     totalPriceWithIVA = totalPriceWithoutIVA * 1.19; // Default IVA 19%
 
@@ -128,11 +191,11 @@ export class AdjudicationsService {
     });
 
     // Save the new item
-    const savedItem = await this.adjudicationItemRepository.save(newItem);
+    const savedItem = (await this.adjudicationItemRepository.save(newItem)) as unknown as AdjudicationItem;
 
     // Recalculate totals
     const existingItems = adjudication.items || [];
-    const allItems = [...existingItems, savedItem];
+    const allItems: AdjudicationItem[] = [...existingItems, savedItem];
     
     let totalPriceWithoutIVA = 0;
     let totalQuantity = 0;

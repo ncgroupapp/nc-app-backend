@@ -8,6 +8,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
+import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
 
 // Enums para los estados
 export enum QuotationAwardStatus {
@@ -70,6 +71,13 @@ export class Quotation {
   @Column({ type: 'int', nullable: true })
   clientId?: number;
 
+  @Column({ type: 'int', nullable: true })
+  licitationId?: number;
+
+  @ManyToOne(() => Licitation, (licitation) => licitation.quotations)
+  @JoinColumn({ name: 'licitationId' })
+  licitation?: Licitation;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   clientName?: string;
 
@@ -101,8 +109,7 @@ export class QuotationItem {
   @Column({ type: 'varchar', length: 255 })
   productName!: string;
 
-  @Column({ type: 'varchar', length: 100 })
-  sku!: string;
+
 
   @Column({ type: 'int', nullable: true })
   providerId?: number;

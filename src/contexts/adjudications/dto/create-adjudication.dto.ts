@@ -4,14 +4,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdjudicationStatus } from '../entities/adjudication.entity';
 
 export class CreateAdjudicationItemDto {
-  @ApiPropertyOptional({ description: 'ID del producto (si existe en el sistema)' })
-  @IsOptional()
+  @ApiProperty({ description: 'ID del producto' })
   @IsNumber()
-  productId?: number;
-
-  @ApiProperty({ description: 'SKU o Parte Número del producto' })
-  @IsString()
-  sku!: string;
+  productId!: number;
 
   @ApiProperty({ description: 'Cantidad adjudicada' })
   @IsNumber()
@@ -22,6 +17,30 @@ export class CreateAdjudicationItemDto {
   @IsNumber()
   @IsPositive()
   unitPrice!: number;
+}
+
+export class NonAwardedItemDto {
+  @ApiProperty({ description: 'ID del producto' })
+  @IsNumber()
+  productId!: number;
+
+  @ApiProperty({ description: 'Nombre de la empresa ganadora' })
+  @IsString()
+  competitorName!: string;
+
+  @ApiProperty({ description: 'RUT de la empresa ganadora' })
+  @IsString()
+  competitorRut!: string;
+
+  @ApiProperty({ description: 'Precio de la competencia' })
+  @IsNumber()
+  @IsPositive()
+  competitorPrice!: number;
+
+  @ApiPropertyOptional({ description: 'Marca ofrecida por la competencia' })
+  @IsOptional()
+  @IsString()
+  competitorBrand?: string;
 }
 
 export class CreateAdjudicationDto {
@@ -49,4 +68,14 @@ export class CreateAdjudicationDto {
   @ValidateNested({ each: true })
   @Type(() => CreateAdjudicationItemDto)
   items!: CreateAdjudicationItemDto[];
+
+  @ApiPropertyOptional({ 
+    description: 'Items NO adjudicados (para historial de competencia)',
+    type: [NonAwardedItemDto]
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NonAwardedItemDto)
+  nonAwardedItems?: NonAwardedItemDto[];
 }

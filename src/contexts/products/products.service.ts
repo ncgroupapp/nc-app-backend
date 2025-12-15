@@ -6,6 +6,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
 import { Provider } from '../providers/entities/provider.entity';
 
+import { FilterProductsDto } from './dto/filter-products.dto';
+
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
@@ -18,7 +20,7 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
-    this.logger.log(`Creating product with SKU: ${createProductDto.sku}`);
+    this.logger.log(`Creating product: ${createProductDto.name}`);
     const { providerIds, ...productData } = createProductDto;
 
     try {
@@ -29,32 +31,95 @@ export class ProductsService {
         await this.assignProvidersToProduct(savedProduct, providerIds);
         const result = await this.productRepository.save(savedProduct);
         this.logger.log(
-          `Product created successfully with ID: ${result.id}, SKU: ${result.sku}`,
+          `Product created successfully with ID: ${result.id}`,
         );
         return result;
       }
 
       this.logger.log(
-        `Product created successfully with ID: ${savedProduct.id}, SKU: ${savedProduct.sku}`,
+        `Product created successfully with ID: ${savedProduct.id}`,
       );
       return savedProduct;
     } catch (error) {
       this.logger.error(
-        `Failed to create product with SKU: ${createProductDto.sku}`,
+        `Failed to create product: ${createProductDto.name}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw error;
     }
   }
 
-  async findAll(sku?: string): Promise<Product[]> {
-    this.logger.debug(`Finding all products${sku ? ` with SKU filter: ${sku}` : ''}`);
+  async findAll(filters?: FilterProductsDto): Promise<Product[]> {
+    this.logger.debug(`Finding products with filters: ${JSON.stringify(filters || {})}`);
+    
     const queryBuilder = this.productRepository
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.providers', 'providers');
 
-    if (sku) {
-      queryBuilder.where('product.sku ILIKE :sku', { sku: `%${sku}%` });
+    if (filters) {
+      // Text filters with partial match (ILIKE for case-insensitive)
+      if (filters.name) {
+        queryBuilder.andWhere('product.name ILIKE :name', { name: `%${filters.name}%` });
+      }
+
+      if (filters.brand) {
+        queryBuilder.andWhere('product.brand ILIKE :brand', { brand: `%${filters.brand}%` });
+      }
+
+      if (filters.model) {
+        queryBuilder.andWhere('product.model ILIKE :model', { model: `%${filters.model}%` });
+      }
+
+      if (filters.details) {
+        queryBuilder.andWhere('product.details ILIKE :details', { details: `%${filters.details}%` });
+      }
+
+      if (filters.description) {
+        queryBuilder.andWhere('product.description ILIKE :description', { description: `%${filters.description}%` });
+      }
+
+      if (filters.observations) {
+        queryBuilder.andWhere('product.observations ILIKE :observations', { observations: `%${filters.observations}%` });
+      }
+
+      if (filters.equipment) {
+        queryBuilder.andWhere('product.equipment ILIKE :equipment', { equipment: `%${filters.equipment}%` });
+      }
+
+      if (filters.chassis) {
+        queryBuilder.andWhere('product.chassis ILIKE :chassis', { chassis: `%${filters.chassis}%` });
+      }
+
+      if (filters.motor) {
+        queryBuilder.andWhere('product.motor ILIKE :motor', { motor: `%${filters.motor}%` });
+      }
+
+      // Price range filters
+      if (filters.minPrice !== undefined) {
+        queryBuilder.andWhere('product.price >= :minPrice', { minPrice: filters.minPrice });
+      }
+
+      if (filters.maxPrice !== undefined) {
+        queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice: filters.maxPrice });
+      }
+
+      // Stock filter
+      if (filters.minStock !== undefined) {
+        queryBuilder.andWhere('product.stock >= :minStock', { minStock: filters.minStock });
+      }
+
+      // Provider filter - products that have at least one of the specified providers
+      if (filters.providerIds && filters.providerIds.length > 0) {
+        queryBuilder.andWhere('providers.id IN (:...providerIds)', { providerIds: filters.providerIds });
+      }
+
+      // General search across multiple fields
+      if (filters.search) {
+        queryBuilder.andWhere(
+          '(product.name ILIKE :search OR product.brand ILIKE :search OR product.model ILIKE :search OR product.description ILIKE :search)',
+          { search: `%${filters.search}%` }
+        );
+      }
     }
 
     const products = await queryBuilder.getMany();
@@ -75,7 +140,7 @@ export class ProductsService {
         `Product with ID ${id} not found. Please verify the ID and try again.`,
       );
     }
-    this.logger.debug(`Product found: ${product.sku}`);
+    this.logger.debug(`Product found: ${product.name}`);
     return product;
   }
 
@@ -94,7 +159,7 @@ export class ProductsService {
 
       const updatedProduct = await this.productRepository.save(product);
       this.logger.log(
-        `Product updated successfully: ID ${id}, SKU: ${updatedProduct.sku}`,
+        `Product updated successfully: ID ${id}`,
       );
       return updatedProduct;
     } catch (error) {
@@ -113,7 +178,7 @@ export class ProductsService {
     try {
       await this.productRepository.remove(product);
       this.logger.log(
-        `Product deleted successfully: ID ${id}, SKU: ${product.sku}`,
+        `Product deleted successfully: ID ${id}`,
       );
     } catch (error) {
       this.logger.error(
@@ -124,13 +189,7 @@ export class ProductsService {
     }
   }
 
-  async checkSkuExists(sku: string): Promise<boolean> {
-    this.logger.debug(`Checking if SKU exists: ${sku}`);
-    const product = await this.productRepository.findOne({ where: { sku } });
-    const exists = !!product;
-    this.logger.debug(`SKU ${sku} ${exists ? "exists" : "does not exist"}`);
-    return exists;
-  }
+
 
   private async validateProvidersExist(
     providerIds: number[],
