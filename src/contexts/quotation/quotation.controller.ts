@@ -147,11 +147,10 @@ export class QuotationController {
   }
 
   @Delete(":id")
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Eliminar cotización" })
   @ApiParam({ name: "id", description: "ID de la cotización" })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: "Cotización eliminada exitosamente",
   })
   @ApiResponse({

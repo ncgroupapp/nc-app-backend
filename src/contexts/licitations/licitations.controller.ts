@@ -87,10 +87,9 @@ export class LicitationsController {
   }
 
   @Delete(":id")
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a licitation" })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: "Licitation deleted successfully",
   })
   @ApiResponse({ status: 404, description: "Licitation not found" })

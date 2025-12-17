@@ -99,10 +99,9 @@ export class ClientsController {
   }
 
   @Delete(":id")
-  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Delete a client" })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: "Client deleted successfully",
   })
   @ApiResponse({ status: 404, description: "Client not found" })
