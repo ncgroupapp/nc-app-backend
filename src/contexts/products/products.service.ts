@@ -5,6 +5,8 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
 import { Provider } from '../providers/entities/provider.entity';
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class ProductsService {
@@ -47,19 +49,31 @@ export class ProductsService {
     }
   }
 
-  async findAll(sku?: string): Promise<Product[]> {
+  async findAll(paginationDto: PaginationDto, sku?: string): Promise<PaginatedResult<Product>> {
+    const { page = 1, limit = 10 } = paginationDto;
     this.logger.debug(`Finding all products${sku ? ` with SKU filter: ${sku}` : ''}`);
     const queryBuilder = this.productRepository
       .createQueryBuilder('product')
-      .leftJoinAndSelect('product.providers', 'providers');
+      .leftJoinAndSelect('product.providers', 'providers')
+      .skip((page - 1) * limit)
+      .take(limit);
 
     if (sku) {
       queryBuilder.where('product.sku ILIKE :sku', { sku: `%${sku}%` });
     }
 
-    const products = await queryBuilder.getMany();
-    this.logger.log(`Found ${products.length} products`);
-    return products;
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    this.logger.log(`Found ${data.length} products`);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Product> {

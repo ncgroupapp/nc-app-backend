@@ -4,6 +4,7 @@ import { AdjudicationsService } from './adjudications.service';
 import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
 import { AddAdjudicationItemDto } from './dto/add-adjudication-item.dto';
 import { Adjudication } from './entities/adjudication.entity';
+import { PaginationDto } from "../shared/dto/pagination.dto";
 
 @ApiTags('adjudications')
 @Controller('adjudications')
@@ -51,10 +52,11 @@ export class AdjudicationsController {
     description: 'Lista de adjudicaciones obtenida exitosamente',
   })
   findAll(
+    @Query() paginationDto: PaginationDto,
     @Query('status') status?: string,
     @Query('quotationId') quotationId?: string,
     @Query('licitationId') licitationId?: string,
-  ): Promise<Adjudication[]> {
+  ) {
     if (status) {
       return this.adjudicationsService.findByStatus(status as any);
     }
@@ -64,7 +66,7 @@ export class AdjudicationsController {
     if (licitationId) {
       return this.adjudicationsService.findByLicitation(+licitationId);
     }
-    return this.adjudicationsService.findAll();
+    return this.adjudicationsService.findAll(paginationDto);
   }
 
   @Get('quotation/:quotationId')

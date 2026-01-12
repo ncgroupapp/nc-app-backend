@@ -6,6 +6,8 @@ import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
 import { DeliveriesService } from '@/contexts/deliveries/deliveries.service';
 import { Quotation } from '@/contexts/quotation/entities/quotation.entity';
 import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class AdjudicationsService {
@@ -73,11 +75,24 @@ export class AdjudicationsService {
     return savedAdjudication;
   }
 
-  async findAll(): Promise<Adjudication[]> {
-    return await this.adjudicationRepository.find({
+  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Adjudication>> {
+    const { page = 1, limit = 10 } = paginationDto;
+    const [data, total] = await this.adjudicationRepository.findAndCount({
       relations: ['items'],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Adjudication> {

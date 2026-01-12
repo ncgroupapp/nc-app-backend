@@ -3,6 +3,7 @@ import { ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { ManualsService } from './manuals.service';
 import { CreateManualDto } from './dto/create-manual.dto';
 import { UpdateManualDto } from './dto/update-manual.dto';
+import { PaginationDto } from "../shared/dto/pagination.dto";
 
 @ApiTags('manuals')
 @Controller('manuals')
@@ -18,8 +19,11 @@ export class ManualsController {
 
   @Get()
   @ApiQuery({ name: 'search', required: false })
-  findAll(@Query('search') search?: string) {
-    return this.manualsService.findAll(search);
+  findAll(
+    @Query() paginationDto: PaginationDto,
+    @Query('search') search?: string
+  ) {
+    return this.manualsService.findAll(paginationDto, search);
   }
 
   @Get(':id')

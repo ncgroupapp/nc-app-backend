@@ -6,6 +6,8 @@ import { UpdateQuotationDto } from './dto/update-quotation.dto';
 import { Quotation, QuotationItem, QuotationStatus } from './entities/quotation.entity';
 import { AdjudicationsService } from '@/contexts/adjudications/adjudications.service';
 import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudication.entity';
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class QuotationService {
@@ -54,11 +56,24 @@ export class QuotationService {
     return await this.quotationRepository.save(quotation);
   }
 
-  async findAll(): Promise<Quotation[]> {
-    return await this.quotationRepository.find({
+  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Quotation>> {
+    const { page = 1, limit = 10 } = paginationDto;
+    const [data, total] = await this.quotationRepository.findAndCount({
       relations: ['items'],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Quotation> {

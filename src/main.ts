@@ -49,6 +49,7 @@ async function bootstrap() {
     .setTitle("Corna App")
     .setDescription("The Corna App API description")
     .setVersion("1.0")
+    .addBearerAuth()
     .addTag("corna")
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);

@@ -10,6 +10,7 @@ import {
   HttpStatus,
   ParseIntPipe,
   Logger,
+  Query,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -20,6 +21,8 @@ import { LicitationsService } from "./licitations.service";
 import { CreateLicitationDto } from "./dto/create-licitation.dto";
 import { UpdateLicitationDto } from "./dto/update-licitation.dto";
 import { Licitation } from "./entities/licitation.entity";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @ApiTags("licitations")
 @Controller("licitations")
@@ -51,9 +54,9 @@ export class LicitationsController {
     description: "List of licitations",
     type: [Licitation],
   })
-  async findAll(): Promise<Licitation[]> {
+  async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
     this.logger.debug("GET /licitations");
-    return this.licitationsService.findAll();
+    return this.licitationsService.findAll(paginationDto);
   }
 
   @Get(":id")

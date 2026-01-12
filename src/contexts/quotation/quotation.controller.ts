@@ -24,6 +24,7 @@ import { QuotationService } from './quotation.service';
 import { QuotationPdfService } from './quotation-pdf.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
+import { PaginationDto } from "../shared/dto/pagination.dto";
 
 @ApiTags("quotations")
 @Controller("quotation")
@@ -64,6 +65,7 @@ export class QuotationController {
     description: "Lista de cotizaciones obtenida exitosamente",
   })
   findAll(
+    @Query() paginationDto: PaginationDto,
     @Query("status") status?: string,
     @Query("clientId") clientId?: string,
   ) {
@@ -73,7 +75,7 @@ export class QuotationController {
     if (clientId) {
       return this.quotationService.findByClient(+clientId);
     }
-    return this.quotationService.findAll();
+    return this.quotationService.findAll(paginationDto);
   }
 
   @Get("identifier/:identifier")

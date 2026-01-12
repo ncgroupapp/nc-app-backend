@@ -9,6 +9,8 @@ import { Repository } from "typeorm";
 import { CreateProviderDto } from "./dto/create-provider.dto";
 import { UpdateProviderDto } from "./dto/update-provider.dto";
 import { Provider } from "./entities/provider.entity";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class ProvidersService {
@@ -44,13 +46,26 @@ export class ProvidersService {
     }
   }
 
-  async findAll(): Promise<Provider[]> {
-    this.logger.debug("Finding all providers");
-    const providers = await this.providerRepository.find({
+  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Provider>> {
+    const { page = 1, limit = 10 } = paginationDto;
+    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}`);
+
+    const [data, total] = await this.providerRepository.findAndCount({
       order: { createdAt: "DESC" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-    this.logger.log(`Found ${providers.length} providers`);
-    return providers;
+
+    this.logger.log(`Found ${data.length} providers`);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Provider> {

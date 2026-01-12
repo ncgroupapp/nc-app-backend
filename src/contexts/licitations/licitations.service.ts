@@ -11,6 +11,8 @@ import { UpdateLicitationDto } from "./dto/update-licitation.dto";
 import { Licitation, LicitationStatus } from "./entities/licitation.entity";
 import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class LicitationsService {
@@ -65,14 +67,25 @@ export class LicitationsService {
     }
   }
 
-  async findAll(): Promise<Licitation[]> {
+  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
+    const { page = 1, limit = 10 } = paginationDto;
     this.logger.debug("Finding all licitations");
-    const licitations = await this.licitationRepository.find({
+    const [data, total] = await this.licitationRepository.findAndCount({
       relations: ["client", "products"],
       order: { createdAt: "DESC" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-    this.logger.log(`Found ${licitations.length} licitations`);
-    return licitations;
+    this.logger.log(`Found ${data.length} licitations`);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Licitation> {

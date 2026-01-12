@@ -3,6 +3,7 @@ import { ApiTags, ApiQuery } from '@nestjs/swagger';
 import { ImportsService } from './imports.service';
 import { CreateImportDto } from './dto/create-import.dto';
 import { UpdateImportDto } from './dto/update-import.dto';
+import { PaginationDto } from "../shared/dto/pagination.dto";
 
 @ApiTags('imports')
 @Controller('imports')
@@ -20,12 +21,13 @@ export class ImportsController {
   @ApiQuery({ name: 'fromDate', required: false })
   @ApiQuery({ name: 'toDate', required: false })
   findAll(
+    @Query() paginationDto: PaginationDto,
     @Query('status') status?: string,
     @Query('providerId') providerId?: number,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    return this.importsService.findAll(status, providerId, fromDate, toDate);
+    return this.importsService.findAll(paginationDto, status, providerId, fromDate, toDate);
   }
 
   @Get(':id')

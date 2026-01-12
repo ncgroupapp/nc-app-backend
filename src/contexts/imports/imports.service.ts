@@ -7,6 +7,8 @@ import { Import } from './entities/import.entity';
 import { Product } from '../products/entities/product.entity';
 import { Licitation } from '../licitations/entities/licitation.entity';
 import { Provider } from '../providers/entities/provider.entity';
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class ImportsService {
@@ -50,7 +52,8 @@ export class ImportsService {
     return this.importRepository.save(newImport);
   }
 
-  async findAll(status?: string, providerId?: number, fromDate?: string, toDate?: string): Promise<Import[]> {
+  async findAll(paginationDto: PaginationDto, status?: string, providerId?: number, fromDate?: string, toDate?: string): Promise<PaginatedResult<Import>> {
+    const { page = 1, limit = 10 } = paginationDto;
     const where: any = {};
 
     if (status) {
@@ -69,10 +72,23 @@ export class ImportsService {
       where.importDate = LessThanOrEqual(toDate);
     }
 
-    return this.importRepository.find({
+    const [data, total] = await this.importRepository.findAndCount({
       where,
       relations: ['provider', 'products', 'licitations'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Import> {

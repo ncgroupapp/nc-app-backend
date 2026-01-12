@@ -10,6 +10,8 @@ import { UpdateOfferDto } from "./dto/update-offer.dto";
 import { Offer } from "./entities/offer.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
 import { Provider } from "@/contexts/providers/entities/provider.entity";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
 export class OffersService {
@@ -55,18 +57,29 @@ export class OffersService {
     }
   }
 
-  async findAll(productId?: number): Promise<Offer[]> {
+  async findAll(paginationDto: PaginationDto, productId?: number): Promise<PaginatedResult<Offer>> {
+    const { page = 1, limit = 10 } = paginationDto;
     this.logger.debug(
       `Finding all offers${productId ? ` for product ID: ${productId}` : ""}`,
     );
     const where = productId ? { productId } : {};
-    const offers = await this.offerRepository.find({
+    const [data, total] = await this.offerRepository.findAndCount({
       where,
       relations: ["product", "provider"],
       order: { createdAt: "DESC" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-    this.logger.log(`Found ${offers.length} offers`);
-    return offers;
+    this.logger.log(`Found ${data.length} offers`);
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Offer> {

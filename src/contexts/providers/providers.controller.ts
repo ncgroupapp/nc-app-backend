@@ -22,6 +22,8 @@ import { ProvidersService } from "./providers.service";
 import { CreateProviderDto } from "./dto/create-provider.dto";
 import { UpdateProviderDto } from "./dto/update-provider.dto";
 import { Provider } from "./entities/provider.entity";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @ApiTags("providers")
 @Controller("providers")
@@ -59,13 +61,16 @@ export class ProvidersController {
     description: "Filter by RUT",
     type: String,
   })
-  async findAll(@Query("rut") rut?: string): Promise<Provider[]> {
+  async findAll(
+    @Query() paginationDto: PaginationDto,
+    @Query("rut") rut?: string
+  ): Promise<PaginatedResult<Provider> | Provider[]> {
     this.logger.debug(`GET /providers${rut ? `?rut=${rut}` : ""}`);
     if (rut) {
       const provider = await this.providersService.findByRut(rut);
       return provider ? [provider] : [];
     }
-    return this.providersService.findAll();
+    return this.providersService.findAll(paginationDto);
   }
 
   @Get(":id")

@@ -22,6 +22,8 @@ import { OffersService } from "./offers.service";
 import { CreateOfferDto } from "./dto/create-offer.dto";
 import { UpdateOfferDto } from "./dto/update-offer.dto";
 import { Offer } from "./entities/offer.entity";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @ApiTags("offers")
 @Controller("offers")
@@ -60,15 +62,16 @@ export class OffersController {
     type: Number,
   })
   async findAll(
+    @Query() paginationDto: PaginationDto,
     @Query("productId") productId?: string,
-  ): Promise<Offer[]> {
+  ): Promise<PaginatedResult<Offer>> {
     this.logger.debug(
       `GET /offers${productId ? `?productId=${productId}` : ""}`,
     );
     const productIdNum = productId
       ? parseInt(productId, 10)
       : undefined;
-    return this.offersService.findAll(productIdNum);
+    return this.offersService.findAll(paginationDto, productIdNum);
   }
 
   @Get(":id")

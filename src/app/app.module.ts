@@ -7,6 +7,7 @@ import { DatabaseModule } from "@/shared/database/database.module";
 import { LoggerModule } from "@/shared/logger/logger.module";
 
 import { UserModule } from "@/contexts/users/user.module";
+import { AuthModule } from "@/contexts/auth/auth.module";
 import { ProductsModule } from "../contexts/products/products.module";
 import { ProvidersModule } from "../contexts/providers/providers.module";
 import { ClientsModule } from "../contexts/clients/clients.module";
@@ -25,6 +26,7 @@ import { ManualsModule } from "../contexts/manuals/manuals.module";
     LoggerModule,
     HealthModule,
     UserModule,
+    AuthModule,
     ProductsModule,
     ProvidersModule,
     ClientsModule,

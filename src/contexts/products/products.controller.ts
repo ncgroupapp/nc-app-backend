@@ -4,6 +4,8 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @ApiTags('products')
 @Controller('products')
@@ -24,9 +26,12 @@ export class ProductsController {
   @ApiOperation({ summary: 'Get all products' })
   @ApiQuery({ name: 'sku', required: false, description: 'Filter products by SKU (partial match)' })
   @ApiResponse({ status: 200, description: 'List of products', type: [Product] })
-  async findAll(@Query('sku') sku?: string): Promise<Product[]> {
+  async findAll(
+    @Query() paginationDto: PaginationDto,
+    @Query('sku') sku?: string
+  ): Promise<PaginatedResult<Product>> {
     this.logger.debug(`GET /products${sku ? `?sku=${sku}` : ''}`);
-    return this.productsService.findAll(sku);
+    return this.productsService.findAll(paginationDto, sku);
   }
 
   @Get('check-sku/:sku')
