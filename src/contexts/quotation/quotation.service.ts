@@ -8,6 +8,7 @@ import { AdjudicationsService } from '@/contexts/adjudications/adjudications.ser
 import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudication.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { Product } from '@/contexts/products/entities/product.entity';
 
 @Injectable()
 export class QuotationService {
@@ -16,6 +17,8 @@ export class QuotationService {
     private readonly quotationRepository: Repository<Quotation>,
     @InjectRepository(QuotationItem)
     private readonly quotationItemRepository: Repository<QuotationItem>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     private readonly adjudicationsService: AdjudicationsService,
   ) {}
 
@@ -45,12 +48,21 @@ export class QuotationService {
         ? new Date(createQuotationDto.validUntil)
         : undefined,
       clientId: createQuotationDto.clientId,
+      licitationId: createQuotationDto.licitationId,
       clientName: createQuotationDto.clientName,
+
       paymentForm: createQuotationDto.paymentForm,
       validity: createQuotationDto.validity,
-      items: createQuotationDto.items.map((item) =>
-        this.quotationItemRepository.create(item),
-      ),
+      items: await Promise.all(createQuotationDto.items.map(async (item) => {
+        const product = await this.productRepository.findOne({ where: { id: item.productId } });
+        if (!product) {
+          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+        }
+        return this.quotationItemRepository.create({
+          ...item,
+          productName: product.name,
+        });
+      })),
     });
 
     return await this.quotationRepository.save(quotation);
@@ -134,9 +146,17 @@ export class QuotationService {
       }
 
       // Crear nuevos items
-      quotation.items = updateQuotationDto.items.map((item) =>
-        this.quotationItemRepository.create({ ...item, quotationId: id }),
-      );
+      quotation.items = await Promise.all(updateQuotationDto.items.map(async (item) => {
+        const product = await this.productRepository.findOne({ where: { id: item.productId } });
+        if (!product) {
+          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+        }
+        return this.quotationItemRepository.create({ 
+          ...item, 
+          quotationId: id,
+          productName: product.name,
+        });
+      }));
     }
 
     // Actualizar campos de la cotización

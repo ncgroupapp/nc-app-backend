@@ -89,8 +89,7 @@ export class AdjudicationItem {
   @JoinColumn({ name: 'productId' })
   product?: Product;
 
-  @Column({ type: 'varchar', length: 100 })
-  sku!: string;
+
 
   @Column({ type: 'int' })
   quantity!: number;

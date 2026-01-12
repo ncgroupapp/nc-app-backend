@@ -201,8 +201,8 @@ export class QuotationPdfService {
             align: 'left' 
           });
           
-          // Parte Número (SKU)
-          doc.text(item.sku, columnPositions[4].x + 2, currentY + 8, { 
+          // Parte Número (ID)
+          doc.text(item.productId?.toString() || '', columnPositions[4].x + 2, currentY + 8, { 
             width: columnPositions[4].width - 4, 
             align: 'center' 
           });

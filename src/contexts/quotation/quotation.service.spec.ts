@@ -58,8 +58,8 @@ describe('QuotationService', () => {
         status: QuotationStatus.CREATED,
         items: [
           {
-            productName: 'Test Product',
-            sku: 'SKU-001',
+
+            productId: 1,
             inStock: true,
             quantity: 10,
             priceWithoutIVA: 1000,
