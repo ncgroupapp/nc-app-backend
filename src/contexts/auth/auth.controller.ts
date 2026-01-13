@@ -10,7 +10,7 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Request() req, @Body() loginDto: LoginDto) { // Added loginDto for Swagger/Validation visibility, though LocalStrategy uses body too
+  async login(@Request() req: any, @Body() loginDto: LoginDto) { // Added loginDto for Swagger/Validation visibility, though LocalStrategy uses body too
     return this.authService.login(req.user);
   }
 

@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { HealthModule } from "@/app/health/health.module";
@@ -18,6 +18,10 @@ import { AdjudicationsModule } from "../contexts/adjudications/adjudications.mod
 import { DeliveriesModule } from "../contexts/deliveries/deliveries.module";
 import { ImportsModule } from "../contexts/imports/imports.module";
 import { ManualsModule } from "../contexts/manuals/manuals.module";
+
+import { AuthMiddleware } from "@/src/contexts/auth/middlewares/auth.middleware";
+import { LoggerMiddleware } from "@/shared/logger/logger.middleware";
+import { CorrelationIdMiddleware } from "@/shared/middlewares/correlation-id.middleware";
 
 @Module({
   imports: [
@@ -39,4 +43,19 @@ import { ManualsModule } from "../contexts/manuals/manuals.module";
     ManualsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): any {
+    consumer
+      .apply(AuthMiddleware)
+      .exclude(
+        { path: "auth/login", method: RequestMethod.POST },
+        { path: "auth/login", method: RequestMethod.OPTIONS },
+        { path: "api", method: RequestMethod.GET },
+        { path: "api/(.*)", method: RequestMethod.GET },
+      )
+      .forRoutes("*");
+
+    consumer.apply(LoggerMiddleware).forRoutes("*");
+    consumer.apply(CorrelationIdMiddleware).forRoutes("*");
+  }
+}

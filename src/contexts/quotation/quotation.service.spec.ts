@@ -109,7 +109,7 @@ describe('QuotationService', () => {
 
       mockQuotationRepository.find.mockResolvedValue(mockQuotations);
 
-      const result = await service.findAll();
+      const result = await service.findAll({});
 
       expect(result).toEqual(mockQuotations);
       expect(mockQuotationRepository.find).toHaveBeenCalledWith({

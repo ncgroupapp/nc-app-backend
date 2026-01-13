@@ -1,42 +1,50 @@
 import {
-  ExceptionFilter,
-  Catch,
   ArgumentsHost,
+  Catch,
+  ExceptionFilter,
   HttpException,
   HttpStatus,
-} from '@nestjs/common';
-import { FastifyReply, FastifyRequest } from 'fastify';
+  Logger,
+} from "@nestjs/common";
+import { FastifyReply } from "fastify";
 
-@Catch()
+@Catch() // Captura todas las excepciones
 export class AllExceptionsFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<FastifyReply>();
-    const request = ctx.getRequest<FastifyRequest>();
+  private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  async catch(exception: any, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response: any = ctx.getResponse<FastifyReply>(); // Obtén el objeto FastifyReply pero lo declaro como any ya que no reconoce los metodos
+
+    // Determina el estado de la excepción
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const exceptionResponse =
+    const message =
       exception instanceof HttpException
         ? exception.getResponse()
-        : { message: 'Internal server error' };
+        : (exception.message ?? "Internal server error");
 
-    const responseBody = {
-      success: false,
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-    };
+    // Log de la excepción
+    this.logger.error(
+      `HTTP Status: ${status} Error Message: ${JSON.stringify(message)}`,
+    );
 
-    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-      Object.assign(responseBody, exceptionResponse);
+    if (response.code) {
+      await response.code(status).send({
+        success: false,
+        data: message,
+      });
     } else {
-      (responseBody as any).message = exceptionResponse;
+      response.writeHead(status, { "Content-Type": "application/json" });
+      await response.end(
+        JSON.stringify({
+          success: false,
+          data: message,
+        }),
+      );
     }
-
-    response.status(status).send(responseBody);
   }
 }

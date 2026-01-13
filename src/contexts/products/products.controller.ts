@@ -26,7 +26,7 @@ export class ProductsController {
   @Get()
   @ApiOperation({ summary: 'Get all products with optional filters' })
   @ApiResponse({ status: 200, description: 'List of products', type: [Product] })
-  async findAll(@Query() filters: FilterProductsDto): Promise<Product[]> {
+  async findAll(@Query() filters: FilterProductsDto): Promise<PaginatedResult<Product>> {
     this.logger.debug(`GET /products with filters: ${JSON.stringify(filters)}`);
     return this.productsService.findAll(filters);
   }

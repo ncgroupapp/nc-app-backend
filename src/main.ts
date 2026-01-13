@@ -8,6 +8,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from "@nestjs/platform-fastify";
+import fastifyCors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
@@ -23,10 +24,22 @@ async function bootstrap() {
 
   await app.register(multipart);
 
-  app.enableCors({
-    origin: ["http://localhost:3001"],
-    credentials: true,
-  });
+  // Configuración CORS
+  await app
+    .getHttpAdapter()
+    .getInstance()
+    .register(fastifyCors, {
+      origin: [
+        "http://localhost:3001",
+        "http://localhost:4200",
+        "http://localhost:4201",
+        "http://localhost:8100",
+        "http://127.0.0.1:55376",
+      ],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Authorization", "Content-Type"],
+      credentials: true,
+    });
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -40,6 +53,7 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(new TransformInterceptor());
+  const httpAdapter = app.getHttpAdapter();
   app.useGlobalFilters(new AllExceptionsFilter());
 
   const configService = app.get(ConfigService);
