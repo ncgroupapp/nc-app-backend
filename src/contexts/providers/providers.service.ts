@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -23,8 +24,9 @@ export class ProvidersService {
 
   async create(createProviderDto: CreateProviderDto): Promise<Provider> {
     this.logger.log(`Creating provider with RUT: ${createProviderDto.rut}`);
-    
+
     const normalizedRut = this.normalizeRut(createProviderDto.rut);
+    this.validateRutChecksum(normalizedRut);
     await this.validateRutNotExists(normalizedRut);
 
     try {
@@ -95,6 +97,7 @@ export class ProvidersService {
 
     if (updateProviderDto.rut && updateProviderDto.rut !== provider.rut) {
       const normalizedRut = this.normalizeRut(updateProviderDto.rut);
+      this.validateRutChecksum(normalizedRut);
       await this.validateRutNotExists(normalizedRut);
       updateProviderDto.rut = normalizedRut;
     }
@@ -148,16 +151,55 @@ export class ProvidersService {
    * Remueve puntos y espacios, mantiene el guion y el dígito verificador
    */
   private normalizeRut(rut: string): string {
-    const cleanRut = rut.trim().toUpperCase().replace(/\./g, "").replace(/\s/g, "");
+    const cleanRut = rut
+      .trim()
+      .toUpperCase()
+      .replace(/\./g, "")
+      .replace(/\s/g, "");
 
     if (!cleanRut.includes("-")) {
       const numberPart = cleanRut.slice(0, -1);
       const checkDigit = cleanRut.slice(-1);
-      return `${numberPart.padStart(8, "0")}-${checkDigit}`;
+      return `${numberPart}-${checkDigit}`;
     }
 
     const [numberPart, checkDigit] = cleanRut.split("-");
-    return `${numberPart.padStart(8, "0")}-${checkDigit}`;
+    return `${numberPart}-${checkDigit}`;
+  }
+
+  private validateRutChecksum(rut: string): void {
+    const cleanRut = rut.replace(/[^0-9]/g, "");
+
+    if (cleanRut.length !== 12) {
+      throw new BadRequestException("El RUT debe tener 12 dígitos.");
+    }
+
+    const digits = cleanRut.split("").map(Number);
+    const verifier = digits.pop();
+    const factors = [4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+
+    let total = 0;
+    for (const [i, factor] of factors.entries()) {
+      total += digits[i] * factor;
+    }
+
+    const remainder = total % 11;
+    let computedVerifier = 11 - remainder;
+
+    if (computedVerifier === 11) {
+      computedVerifier = 0;
+    }
+
+    // Nota: El caso de que dé 10 se asume como inválido para este algoritmo estándar
+    if (computedVerifier === 10) {
+      throw new BadRequestException("El RUT calculado es inválido.");
+    }
+
+    if (computedVerifier !== verifier) {
+      throw new BadRequestException(
+        "El RUT proporcionado no es válido (dígito verificador incorrecto).",
+      );
+    }
   }
 }
 

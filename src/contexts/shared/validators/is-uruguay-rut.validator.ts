@@ -16,77 +16,49 @@ export class IsUruguayRutConstraint implements ValidatorConstraintInterface {
       return false;
     }
 
-    // Remover espacios y convertir a mayúsculas
-    const cleanRut = rut.trim().toUpperCase();
+    // Remover todo lo que no sea dígito
+    const cleanRut = rut.replace(/[^0-9]/g, "");
 
-    // Validar formato básico: debe tener guion y formato correcto
-    const rutRegex = /^(\d{1,2}\.?\d{3}\.?\d{3})-?(\d|K)$/;
-    if (!rutRegex.test(cleanRut)) {
+    // RUT debe tener 12 dígitos
+    if (cleanRut.length !== 12) {
       return false;
     }
 
-    // Extraer número y dígito verificador
-    const rutWithoutDots = cleanRut.replace(/\./g, "");
-    const parts = rutWithoutDots.split("-");
-    
-    if (parts.length !== 2) {
-      // Si no tiene guion, intentar separar los últimos caracteres
-      if (rutWithoutDots.length < 8 || rutWithoutDots.length > 9) {
-        return false;
-      }
-      const numberPart = rutWithoutDots.slice(0, -1);
-      const checkDigit = rutWithoutDots.slice(-1);
-      return this.validateCheckDigit(numberPart, checkDigit);
-    }
-
-    const [numberPart, checkDigit] = parts;
-
-    // Validar que el número tenga entre 7 y 8 dígitos
-    if (numberPart.length < 7 || numberPart.length > 8) {
-      return false;
-    }
-
-    return this.validateCheckDigit(numberPart, checkDigit);
+    return this.validateCheckDigit(cleanRut);
   }
 
   defaultMessage(): string {
-    return "RUT must be a valid Uruguayan RUT format (XXXXXXXX-X) with valid check digit";
+    return "RUT must be a valid Uruguayan RUT format (12 digits) with valid check digit";
   }
 
   /**
-   * Valida el dígito verificador del RUT uruguayo
-   * Algoritmo: Se multiplican los dígitos por la secuencia 2, 9, 8, 7, 6, 3, 4
-   * Se suman los productos, se divide por 11 y se toma el resto
-   * El dígito verificador es 11 menos el resto (si es 11, se usa 0; si es 10, se usa K)
+   * Valida el dígito verificador del RUT uruguayo (12 dígitos)
    */
-  private validateCheckDigit(numberPart: string, checkDigit: string): boolean {
-    // Asegurar que el número tenga 8 dígitos (rellenar con ceros a la izquierda si es necesario)
-    const paddedNumber = numberPart.padStart(8, "0");
+  private validateCheckDigit(rut: string): boolean {
+    const digits = rut.split("").map(Number);
+    const verifier = digits.pop(); // El último dígito es el verificador
+    
+    // Factores para RUT de 12 dígitos (primeros 11 dígitos)
+    const factors = [4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
-    // Secuencia de multiplicadores para RUT uruguayo
-    const multipliers = [2, 9, 8, 7, 6, 3, 4];
-
-    // Calcular suma de productos
-    let sum = 0;
-    for (let i = 0; i < 7; i++) {
-      const digit = parseInt(paddedNumber[i], 10);
-      sum += digit * multipliers[i];
+    let total = 0;
+    for (let i = 0; i < factors.length; i++) {
+      total += digits[i] * factors[i];
     }
 
-    // Calcular dígito verificador esperado
-    const remainder = sum % 11;
-    let expectedCheckDigit: string;
+    const remainder = total % 11;
+    let computedVerifier = 11 - remainder;
 
-    if (remainder === 0) {
-      expectedCheckDigit = "0";
-    } else if (remainder === 1) {
-      expectedCheckDigit = "K";
-    } else {
-      expectedCheckDigit = (11 - remainder).toString();
+    if (computedVerifier === 11) {
+      computedVerifier = 0;
     }
 
-    // Comparar con el dígito verificador proporcionado
-    return checkDigit.toUpperCase() === expectedCheckDigit;
+    // Si el resultado es 10, el RUT es inválido
+    if (computedVerifier === 10) {
+      return false;
+    }
+
+    return computedVerifier === verifier;
   }
 }
 
