@@ -3,6 +3,19 @@ import { IsString, IsOptional, IsNumber, Min, IsInt, IsArray } from 'class-valid
 import { Type, Transform } from 'class-transformer';
 
 export class FilterProductsDto {
+  @ApiPropertyOptional({ description: 'Page number for pagination', example: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @ApiPropertyOptional({ description: 'Number of items per page', example: 10, default: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
   @ApiPropertyOptional({ description: 'Filter by product name (partial match)', example: 'Laptop' })
   @IsOptional()
   @IsString()
