@@ -21,8 +21,8 @@ import {
 import { OffersService } from "./offers.service";
 import { CreateOfferDto } from "./dto/create-offer.dto";
 import { UpdateOfferDto } from "./dto/update-offer.dto";
+import { OfferFiltersDto } from "./dto/offer-filters.dto";
 import { Offer } from "./entities/offer.entity";
-import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @ApiTags("offers")
@@ -61,17 +61,19 @@ export class OffersController {
     description: "Filter by product ID",
     type: Number,
   })
+  @ApiQuery({
+    name: "providerId",
+    required: false,
+    description: "Filter by provider ID",
+    type: Number,
+  })
   async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query("productId") productId?: string,
+    @Query() filtersDto: OfferFiltersDto,
   ): Promise<PaginatedResult<Offer>> {
     this.logger.debug(
-      `GET /offers${productId ? `?productId=${productId}` : ""}`,
+      `GET /offers${filtersDto.productId ? `?productId=${filtersDto.productId}` : ""}`,
     );
-    const productIdNum = productId
-      ? parseInt(productId, 10)
-      : undefined;
-    return this.offersService.findAll(paginationDto, productIdNum);
+    return this.offersService.findAll(filtersDto, filtersDto.productId);
   }
 
   @Get(":id")

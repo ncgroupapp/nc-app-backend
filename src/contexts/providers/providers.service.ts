@@ -52,14 +52,22 @@ export class ProvidersService {
   }
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Provider>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}`);
+    const { page = 1, limit = 10, search } = paginationDto;
+    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}${search ? `, search: ${search}` : ''}`);
 
-    const [data, total] = await this.providerRepository.findAndCount({
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const queryBuilder = this.providerRepository.createQueryBuilder('provider')
+      .orderBy('provider.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search) {
+      queryBuilder.where(
+        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     this.logger.log(`Found ${data.length} providers`);
     return {

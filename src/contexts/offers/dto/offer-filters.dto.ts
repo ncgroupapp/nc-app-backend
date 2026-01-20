@@ -1,7 +1,7 @@
-import { IsOptional, IsPositive, Min, IsString } from 'class-validator';
+import { IsOptional, IsPositive, Min, IsString, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class PaginationDto {
+export class OfferFiltersDto {
   @IsOptional()
   @Type(() => Number)
   @IsPositive()
@@ -17,4 +17,14 @@ export class PaginationDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  productId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  providerId?: number;
 }

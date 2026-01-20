@@ -13,6 +13,7 @@ import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
 // Enums para los estados
 export enum QuotationAwardStatus {
   AWARDED = 'adjudicado',
+  PARTIALLY_AWARDED = 'adjudicado_parcialmente',
   NOT_AWARDED = 'no_adjudicado',
   PENDING = 'en_espera',
 }
@@ -148,6 +149,16 @@ export class QuotationItem {
     default: QuotationAwardStatus.PENDING,
   })
   awardStatus!: QuotationAwardStatus;
+
+  @Column({ type: 'int', nullable: true })
+  awardedQuantity?: number;
+
+  @Column({ type: 'jsonb', nullable: true })
+  competitorInfo?: {
+    winnerName: string;
+    winnerPrice: number;
+    notes?: string;
+  };
 
   @Column({ type: 'text', nullable: true })
   notes?: string;
