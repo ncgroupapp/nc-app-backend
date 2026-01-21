@@ -10,6 +10,7 @@ import { Repository } from "typeorm";
 import { CreateProviderDto } from "./dto/create-provider.dto";
 import { UpdateProviderDto } from "./dto/update-provider.dto";
 import { Provider } from "./entities/provider.entity";
+import { Product } from "../products/entities/product.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
@@ -20,6 +21,8 @@ export class ProvidersService {
   constructor(
     @InjectRepository(Provider)
     private readonly providerRepository: Repository<Provider>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
   ) {}
 
   async create(createProviderDto: CreateProviderDto): Promise<Provider> {
@@ -49,14 +52,22 @@ export class ProvidersService {
   }
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Provider>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}`);
+    const { page = 1, limit = 10, search } = paginationDto;
+    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}${search ? `, search: ${search}` : ''}`);
 
-    const [data, total] = await this.providerRepository.findAndCount({
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const queryBuilder = this.providerRepository.createQueryBuilder('provider')
+      .orderBy('provider.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search) {
+      queryBuilder.where(
+        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     this.logger.log(`Found ${data.length} providers`);
     return {
@@ -121,6 +132,22 @@ export class ProvidersService {
   async remove(id: number): Promise<void> {
     this.logger.log(`Deleting provider with ID: ${id}`);
     const provider = await this.findOne(id);
+
+    // Check if provider has associated products
+    const associatedProductsCount = await this.productRepository
+      .createQueryBuilder("product")
+      .innerJoin("product.providers", "provider")
+      .where("provider.id = :providerId", { providerId: id })
+      .getCount();
+
+    if (associatedProductsCount > 0) {
+      this.logger.warn(
+        `Cannot delete provider ${id} because it has ${associatedProductsCount} associated products`,
+      );
+      throw new ConflictException(
+        "No se puede eliminar el proveedor porque tiene productos asociados.",
+      );
+    }
 
     try {
       await this.providerRepository.remove(provider);

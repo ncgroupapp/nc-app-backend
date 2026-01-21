@@ -77,6 +77,20 @@ export class CreateQuotationItemDto {
   @IsEnum(QuotationAwardStatus)
   awardStatus!: QuotationAwardStatus;
 
+  @ApiPropertyOptional({ description: 'Cantidad adjudicada' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  awardedQuantity?: number;
+
+  @ApiPropertyOptional({ description: 'Información de la competencia (si se pierde la adjudicación)' })
+  @IsOptional()
+  competitorInfo?: {
+    winnerName: string;
+    winnerPrice: number;
+    notes?: string;
+  };
+
   @ApiPropertyOptional({ description: 'Notas adicionales sobre el item' })
   @IsOptional()
   @IsString()
