@@ -5,11 +5,11 @@ import {
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, Brackets } from "typeorm";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
-import { PaginationDto } from "../shared/dto/pagination.dto";
+import { FilterClientDto } from "./dto/filter-client.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @Injectable()
@@ -43,15 +43,40 @@ export class ClientsService {
     }
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Client>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    this.logger.debug(`Finding clients with page: ${page}, limit: ${limit}`);
+  async findAll(filterDto: FilterClientDto): Promise<PaginatedResult<Client>> {
+    const { page = 1, limit = 10, name, identifier, email } = filterDto;
+    this.logger.debug(
+      `Finding clients with filters: ${JSON.stringify(filterDto)}`,
+    );
 
-    const [data, total] = await this.clientRepository.findAndCount({
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const queryBuilder = this.clientRepository.createQueryBuilder("client");
+
+    if (name || identifier || email) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          if (name) {
+            qb.orWhere("client.name ILIKE :name", { name: `%${name}%` });
+          }
+          if (identifier) {
+            qb.orWhere("client.identifier ILIKE :identifier", {
+              identifier: `%${identifier}%`,
+            });
+          }
+          if (email) {
+            qb.orWhere("client.contacts::text ILIKE :email", {
+              email: `%${email}%`,
+            });
+          }
+        }),
+      );
+    }
+
+    queryBuilder
+      .orderBy("client.createdAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     this.logger.log(`Found ${data.length} clients`);
     return {
@@ -83,10 +108,7 @@ export class ClientsService {
     return this.clientRepository.findOne({ where: { identifier } });
   }
 
-  async update(
-    id: number,
-    updateClientDto: UpdateClientDto,
-  ): Promise<Client> {
+  async update(id: number, updateClientDto: UpdateClientDto): Promise<Client> {
     this.logger.log(`Updating client with ID: ${id}`);
     const client = await this.findOne(id);
 
@@ -134,9 +156,7 @@ export class ClientsService {
   private async validateIdentifierNotExists(identifier: string): Promise<void> {
     const existingClient = await this.findByIdentifier(identifier);
     if (existingClient) {
-      this.logger.warn(
-        `Client with identifier ${identifier} already exists`,
-      );
+      this.logger.warn(`Client with identifier ${identifier} already exists`);
       throw new ConflictException(
         `Client with identifier ${identifier} already exists. Please use a different identifier.`,
       );

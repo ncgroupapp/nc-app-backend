@@ -22,7 +22,7 @@ import { ClientsService } from "./clients.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
-import { PaginationDto } from "../shared/dto/pagination.dto";
+import { FilterClientDto } from "./dto/filter-client.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 
 @ApiTags("clients")
@@ -53,22 +53,9 @@ export class ClientsController {
     description: "List of clients",
     type: [Client],
   })
-  @ApiQuery({
-    name: "identifier",
-    required: false,
-    description: "Filter by identifier/RUT",
-    type: String,
-  })
-  async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query("identifier") identifier?: string,
-  ): Promise<PaginatedResult<Client> | Client[]> {
-    this.logger.debug(`GET /clients${identifier ? `?identifier=${identifier}` : ''}`);
-    if (identifier) {
-      const client = await this.clientsService.findByIdentifier(identifier);
-      return client ? [client] : [];
-    }
-    return this.clientsService.findAll(paginationDto);
+  async findAll(@Query() filterDto: FilterClientDto): Promise<PaginatedResult<Client>> {
+    this.logger.debug(`GET /clients with filters: ${JSON.stringify(filterDto)}`);
+    return this.clientsService.findAll(filterDto);
   }
 
   @Get(":id")
