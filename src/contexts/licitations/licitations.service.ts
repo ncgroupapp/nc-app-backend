@@ -68,15 +68,36 @@ export class LicitationsService {
   }
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    this.logger.debug("Finding all licitations");
-    const [data, total] = await this.licitationRepository.findAndCount({
-      relations: ["client", "products"],
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    this.logger.log(`Found ${data.length} licitations`);
+    const { page = 1, limit = 10, search, status, clientId } = paginationDto;
+    this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}`);
+    
+    const queryBuilder = this.licitationRepository
+      .createQueryBuilder("licitation")
+      .leftJoinAndSelect("licitation.client", "client")
+      .leftJoinAndSelect("licitation.products", "products")
+      .orderBy("licitation.createdAt", "DESC");
+
+    if (search) {
+      queryBuilder.andWhere(
+        "(licitation.callNumber ILIKE :search OR licitation.internalNumber ILIKE :search OR client.name ILIKE :search)",
+        { search: `%${search}%` }
+      );
+    }
+
+    if (status) {
+      queryBuilder.andWhere("licitation.status = :status", { status });
+    }
+
+    if (clientId) {
+      queryBuilder.andWhere("licitation.clientId = :clientId", { clientId });
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    this.logger.log(`Found ${data.length} licitations (total: ${total})`);
     return {
       data,
       meta: {

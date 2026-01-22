@@ -20,9 +20,15 @@ import {
 } from '../entities/quotation.entity';
 
 export class CreateQuotationItemDto {
-  @ApiProperty({ description: 'ID del producto' })
+  @ApiPropertyOptional({ description: 'ID del producto (opcional, para referencia)' })
+  @IsOptional()
   @IsNumber()
-  productId!: number;
+  productId?: number;
+
+  @ApiProperty({ description: 'Nombre del producto' })
+  @IsString()
+  productName!: string;
+
 
   @ApiPropertyOptional({ description: 'ID del proveedor (si existe en el sistema)' })
   @IsOptional()

@@ -54,13 +54,21 @@ export class QuotationService {
       paymentForm: createQuotationDto.paymentForm,
       validity: createQuotationDto.validity,
       items: await Promise.all(createQuotationDto.items.map(async (item) => {
-        const product = await this.productRepository.findOne({ where: { id: item.productId } });
-        if (!product) {
-          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+        // Usar productName del DTO directamente, o buscarlo por productId como fallback
+        let productName = item.productName;
+        if (!productName && item.productId) {
+          const product = await this.productRepository.findOne({ where: { id: item.productId } });
+          if (!product) {
+            throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+          }
+          productName = product.name;
+        }
+        if (!productName) {
+          throw new NotFoundException('Se requiere productName o un productId válido');
         }
         return this.quotationItemRepository.create({
           ...item,
-          productName: product.name,
+          productName,
         });
       })),
     });
@@ -147,21 +155,30 @@ export class QuotationService {
 
       // Crear nuevos items
       quotation.items = await Promise.all(updateQuotationDto.items.map(async (item) => {
-        const product = await this.productRepository.findOne({ where: { id: item.productId } });
-        if (!product) {
-          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+        // Usar productName del DTO directamente, o buscarlo por productId como fallback
+        let productName = item.productName;
+        if (!productName && item.productId) {
+          const product = await this.productRepository.findOne({ where: { id: item.productId } });
+          if (!product) {
+            throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+          }
+          productName = product.name;
+        }
+        if (!productName) {
+          throw new NotFoundException('Se requiere productName o un productId válido');
         }
         return this.quotationItemRepository.create({ 
           ...item, 
           quotationId: id,
-          productName: product.name,
+          productName,
         });
       }));
     }
 
-    // Actualizar campos de la cotización
+    // Actualizar campos de la cotización (excluyendo items ya que fueron procesados arriba)
+    const { items: _items, ...quotationFieldsToUpdate } = updateQuotationDto;
     Object.assign(quotation, {
-      ...updateQuotationDto,
+      ...quotationFieldsToUpdate,
       quotationDate: updateQuotationDto.quotationDate
         ? new Date(updateQuotationDto.quotationDate)
         : quotation.quotationDate,
