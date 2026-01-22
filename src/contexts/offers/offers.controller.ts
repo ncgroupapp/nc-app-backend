@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Query,
   Logger,
+  UseInterceptors,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -24,9 +25,11 @@ import { UpdateOfferDto } from "./dto/update-offer.dto";
 import { OfferFiltersDto } from "./dto/offer-filters.dto";
 import { Offer } from "./entities/offer.entity";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags("offers")
 @Controller("offers")
+@UseInterceptors(TransformInterceptor)
 export class OffersController {
   private readonly logger = new Logger(OffersController.name);
 

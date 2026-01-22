@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Patch, Param, Delete, Body, BadRequestException, NotFoundException, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Delete, Body, BadRequestException, NotFoundException, Query, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { ManualsService } from './manuals.service';
 import { CreateManualDto } from './dto/create-manual.dto';
 import { UpdateManualDto } from './dto/update-manual.dto';
 import { PaginationDto } from "../shared/dto/pagination.dto";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags('manuals')
 @Controller('manuals')
+@UseInterceptors(TransformInterceptor)
 export class ManualsController {
   constructor(private readonly manualsService: ManualsService) {}
 

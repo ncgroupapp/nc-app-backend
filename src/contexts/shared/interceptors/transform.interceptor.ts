@@ -22,6 +22,10 @@ export class TransformInterceptor<T>
   ): Observable<Response<T> | any> {
     return next.handle().pipe(
       map((data) => {
+        if (data && typeof data === 'object' && 'success' in data) {
+          return data;
+        }
+
         if (data && typeof data === 'object' && 'data' in data && 'meta' in data) {
           return {
             success: true,

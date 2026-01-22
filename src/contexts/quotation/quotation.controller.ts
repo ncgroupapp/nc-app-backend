@@ -11,6 +11,7 @@ import {
   Query,
   Res,
   StreamableFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,9 +26,11 @@ import { QuotationPdfService } from './quotation-pdf.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
 import { PaginationDto } from "../shared/dto/pagination.dto";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags("quotations")
 @Controller("quotation")
+@UseInterceptors(TransformInterceptor)
 export class QuotationController {
   constructor(
     private readonly quotationService: QuotationService,

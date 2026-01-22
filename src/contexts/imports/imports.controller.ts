@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiQuery } from '@nestjs/swagger';
 import { ImportsService } from './imports.service';
 import { CreateImportDto } from './dto/create-import.dto';
 import { UpdateImportDto } from './dto/update-import.dto';
 import { PaginationDto } from "../shared/dto/pagination.dto";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags('imports')
 @Controller('imports')
+@UseInterceptors(TransformInterceptor)
 export class ImportsController {
   constructor(private readonly importsService: ImportsService) {}
 
