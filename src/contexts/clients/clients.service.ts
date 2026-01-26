@@ -9,8 +9,8 @@ import { Repository, Brackets } from "typeorm";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
-import { FilterClientDto } from "./dto/filter-client.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { PaginationDto } from "../shared/dto/pagination.dto";
 
 @Injectable()
 export class ClientsService {
@@ -43,38 +43,24 @@ export class ClientsService {
     }
   }
 
-  async findAll(filterDto: FilterClientDto): Promise<PaginatedResult<Client>> {
-    const { page = 1, limit = 10, name, identifier, email } = filterDto;
+  async findAll(filterDto: PaginationDto): Promise<PaginatedResult<Client>> {
+    const { page = 1, limit = 10, search } = filterDto;
     this.logger.debug(
       `Finding clients with filters: ${JSON.stringify(filterDto)}`,
     );
-
-    const queryBuilder = this.clientRepository.createQueryBuilder("client");
-
-    if (name || identifier || email) {
-      queryBuilder.andWhere(
-        new Brackets((qb) => {
-          if (name) {
-            qb.orWhere("client.name ILIKE :name", { name: `%${name}%` });
-          }
-          if (identifier) {
-            qb.orWhere("client.identifier ILIKE :identifier", {
-              identifier: `%${identifier}%`,
-            });
-          }
-          if (email) {
-            qb.orWhere("client.contacts::text ILIKE :email", {
-              email: `%${email}%`,
-            });
-          }
-        }),
-      );
-    }
-
-    queryBuilder
+    
+    const queryBuilder = this.clientRepository
+      .createQueryBuilder("client")
       .orderBy("client.createdAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
+
+    if (search) {
+      queryBuilder.where(
+        'client.name ILIKE :search OR client.identifier ILIKE :search OR client.contacts::text ILIKE :search',
+        { search: `%${search}%` }
+      );
+    }
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
