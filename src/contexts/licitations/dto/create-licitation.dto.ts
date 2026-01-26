@@ -8,9 +8,33 @@ import {
   IsOptional,
   IsEnum,
   ArrayMinSize,
+  ValidateNested,
+  Min,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { LicitationStatus } from "../entities/licitation.entity";
+
+export class ProductWithQuantityDto {
+  @ApiProperty({
+    description: "Product ID",
+    example: 1,
+  })
+  @IsNumber()
+  @IsNotEmpty()
+  @Type(() => Number)
+  productId!: number;
+
+  @ApiProperty({
+    description: "Quantity requested",
+    example: 10,
+    default: 1,
+  })
+  @IsNumber()
+  @Min(1)
+  @IsOptional()
+  @Type(() => Number)
+  quantity?: number;
+}
 
 export class CreateLicitationDto {
   @ApiProperty({
@@ -59,15 +83,28 @@ export class CreateLicitationDto {
   internalNumber!: string;
 
   @ApiProperty({
-    description: "Product IDs",
+    description: "Products with quantity",
+    type: [ProductWithQuantityDto],
+    example: [{ productId: 1, quantity: 10 }, { productId: 2, quantity: 5 }],
+    required: false,
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductWithQuantityDto)
+  @IsOptional()
+  products?: ProductWithQuantityDto[];
+
+  @ApiProperty({
+    description: "Product IDs (deprecated, use 'products' instead)",
     example: [1, 2, 3],
     type: [Number],
+    required: false,
   })
   @IsArray()
   @IsNumber({}, { each: true })
-  @ArrayMinSize(1, { message: "At least one product is required" })
   @Type(() => Number)
-  productIds!: number[];
+  @IsOptional()
+  productIds?: number[];
 
   @ApiProperty({
     description: "Status of the licitation",
