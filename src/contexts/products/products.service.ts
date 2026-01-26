@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, IsNull, In } from 'typeorm';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -7,6 +7,7 @@ import { Product } from './entities/product.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 import { FilterProductsDto } from './dto/filter-products.dto';
 
@@ -77,6 +78,14 @@ export class ProductsService {
         queryBuilder.andWhere('product.model ILIKE :model', { model: `%${filters.model}%` });
       }
 
+      if (filters.code) {
+        queryBuilder.andWhere('product.code ILIKE :code', { code: `%${filters.code}%` });
+      }
+
+      if (filters.equivalentCode) {
+        queryBuilder.andWhere(':equivalentCode = ANY(product.equivalentCodes)', { equivalentCode: filters.equivalentCode });
+      }
+
       if (filters.details) {
         queryBuilder.andWhere('product.details ILIKE :details', { details: `%${filters.details}%` });
       }
@@ -123,8 +132,8 @@ export class ProductsService {
       // General search across multiple fields
       if (filters.search) {
         queryBuilder.andWhere(
-          '(product.name ILIKE :search OR product.brand ILIKE :search OR product.model ILIKE :search OR product.description ILIKE :search)',
-          { search: `%${filters.search}%` }
+          "(product.name ILIKE :search OR product.brand ILIKE :search OR product.code ILIKE :search OR array_to_string(product.equivalentCodes, ',') ILIKE :search OR product.model ILIKE :search OR product.description ILIKE :search)",
+          { search: `%${filters.search}%` },
         );
       }
     }
@@ -152,9 +161,7 @@ export class ProductsService {
 
     if (!product) {
       this.logger.warn(`Product with ID ${id} not found`);
-      throw new NotFoundException(
-        `Product with ID ${id} not found. Please verify the ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(id));
     }
     this.logger.debug(`Product found: ${product.name}`);
     return product;
@@ -196,7 +203,13 @@ export class ProductsService {
       this.logger.log(
         `Product deleted successfully: ID ${id}`,
       );
-    } catch (error) {
+    } catch (error: any) {
+      if (
+        error?.code === '23503' &&
+        (error?.table === 'offers' || error?.message?.includes('table "offers"'))
+      ) {
+        throw new ConflictException(ERROR_MESSAGES.PRODUCTS.CANNOT_DELETE_HAS_OFFERS);
+      }
       this.logger.error(
         `Failed to delete product with ID: ${id}`,
         error instanceof Error ? error.stack : String(error),
@@ -220,9 +233,7 @@ export class ProductsService {
       this.logger.warn(
         `Providers with IDs [${missingIds.join(", ")}] not found. Found providers: [${foundIds.join(", ")}]`,
       );
-      throw new NotFoundException(
-        `Providers with IDs [${missingIds.join(", ")}] not found. Please verify the provider IDs and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND_MANY(missingIds.join(", ")));
     }
 
     return providers;
