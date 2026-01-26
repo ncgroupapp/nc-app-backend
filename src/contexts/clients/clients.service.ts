@@ -11,6 +11,7 @@ import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { PaginationDto } from "../shared/dto/pagination.dto";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class ClientsService {
@@ -81,9 +82,7 @@ export class ClientsService {
     const client = await this.clientRepository.findOne({ where: { id } });
     if (!client) {
       this.logger.warn(`Client with ID ${id} not found`);
-      throw new NotFoundException(
-        `Client with ID ${id} not found. Please verify the ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.CLIENTS.NOT_FOUND(id));
     }
     this.logger.debug(`Client found: ${client.identifier}`);
     return client;
@@ -143,9 +142,7 @@ export class ClientsService {
     const existingClient = await this.findByIdentifier(identifier);
     if (existingClient) {
       this.logger.warn(`Client with identifier ${identifier} already exists`);
-      throw new ConflictException(
-        `Client with identifier ${identifier} already exists. Please use a different identifier.`,
-      );
+      throw new ConflictException(ERROR_MESSAGES.CLIENTS.IDENTIFIER_ALREADY_EXISTS(identifier));
     }
   }
 }

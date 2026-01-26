@@ -9,6 +9,7 @@ import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudicati
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { Product } from '@/contexts/products/entities/product.entity';
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class QuotationService {
@@ -29,9 +30,7 @@ export class QuotationService {
     });
 
     if (existingQuotation) {
-      throw new ConflictException(
-        `Ya existe una cotización con el identificador: ${createQuotationDto.quotationIdentifier}`,
-      );
+      throw new ConflictException(ERROR_MESSAGES.QUOTATION.IDENTIFIER_ALREADY_EXISTS(createQuotationDto.quotationIdentifier));
     }
 
     // Crear la cotización con sus items
@@ -56,7 +55,7 @@ export class QuotationService {
       items: await Promise.all(createQuotationDto.items.map(async (item) => {
         const product = await this.productRepository.findOne({ where: { id: item.productId } });
         if (!product) {
-          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+          throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(item.productId));
         }
         return this.quotationItemRepository.create({
           ...item,
@@ -95,7 +94,7 @@ export class QuotationService {
     });
 
     if (!quotation) {
-      throw new NotFoundException(`Cotización con ID ${id} no encontrada`);
+      throw new NotFoundException(ERROR_MESSAGES.QUOTATION.NOT_FOUND(id));
     }
 
     return quotation;
@@ -108,9 +107,7 @@ export class QuotationService {
     });
 
     if (!quotation) {
-      throw new NotFoundException(
-        `Cotización con identificador ${identifier} no encontrada`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.QUOTATION.IDENTIFIER_NOT_FOUND(identifier));
     }
 
     return quotation;
@@ -132,9 +129,7 @@ export class QuotationService {
       });
 
       if (existingQuotation) {
-        throw new ConflictException(
-          `Ya existe una cotización con el identificador: ${updateQuotationDto.quotationIdentifier}`,
-        );
+        throw new ConflictException(ERROR_MESSAGES.QUOTATION.IDENTIFIER_ALREADY_EXISTS(updateQuotationDto.quotationIdentifier));
       }
     }
 
@@ -149,7 +144,7 @@ export class QuotationService {
       quotation.items = await Promise.all(updateQuotationDto.items.map(async (item) => {
         const product = await this.productRepository.findOne({ where: { id: item.productId } });
         if (!product) {
-          throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
+          throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(item.productId));
         }
         return this.quotationItemRepository.create({ 
           ...item, 

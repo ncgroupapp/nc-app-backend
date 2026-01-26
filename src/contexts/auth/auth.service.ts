@@ -7,6 +7,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ConfigService } from "@nestjs/config";
 import jwt from "jsonwebtoken";
 import { RefreshTokenAuthDto } from './dto/refresh-token-auth.dto';
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class AuthService {
@@ -21,7 +22,7 @@ export class AuthService {
       registerDto.email,
     );
     if (existingUser) {
-      throw new BadRequestException("User already exists");
+      throw new BadRequestException(ERROR_MESSAGES.USERS.ALREADY_EXISTS);
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -110,7 +111,7 @@ export class AuthService {
         await this.getRefreshToken(userId);
 
       if (storedRefreshToken !== _refreshToken) {
-        throw new Error("Token de actualización inválido");
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_TOKEN);
       }
 
       // elimino los campos exp e iat para que se generen de nuevo a lo que no uso las variables tengo que comentarlas con eslint
