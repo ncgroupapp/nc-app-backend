@@ -60,18 +60,28 @@ export class AdjudicationsService {
       totalQuantity += itemDto.quantity;
       totalPriceWithoutIVA += itemDto.unitPrice * itemDto.quantity;
 
-      // Update Quotation Item Status to AWARDED
-      const quotationItem = await this.quotationItemRepository.findOne({
-        where: { 
-          quotationId: createAdjudicationDto.quotationId,
+      // Update Quotation Item Status
+      if (itemDto.productId) {
+        const quotationItem = await this.quotationItemRepository.findOne({
+          where: { 
+            quotationId: createAdjudicationDto.quotationId,
+            productId: itemDto.productId 
+          }
+        });
 
-          productId: itemDto.productId 
+        if (quotationItem) {
+          const currentAwarded = quotationItem.awardedQuantity || 0;
+          const newAwarded = currentAwarded + itemDto.quantity;
+          
+          quotationItem.awardedQuantity = newAwarded;
+
+          if (newAwarded >= quotationItem.quantity) {
+            quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
+          } else {
+            quotationItem.awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
+          }
+          await this.quotationItemRepository.save(quotationItem);
         }
-      });
-
-      if (quotationItem) {
-        quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
-        await this.quotationItemRepository.save(quotationItem);
       }
 
       // Update Product Stock
