@@ -18,6 +18,7 @@ import { AdjudicationsModule } from "../contexts/adjudications/adjudications.mod
 import { DeliveriesModule } from "../contexts/deliveries/deliveries.module";
 import { ImportsModule } from "../contexts/imports/imports.module";
 import { ManualsModule } from "../contexts/manuals/manuals.module";
+import { BrandsModule } from "@/contexts/brands/brands.module";
 
 import { AuthMiddleware } from "@/src/contexts/auth/middlewares/auth.middleware";
 import { LoggerMiddleware } from "@/shared/logger/logger.middleware";
@@ -41,6 +42,7 @@ import { CorrelationIdMiddleware } from "@/shared/middlewares/correlation-id.mid
     DeliveriesModule,
     ImportsModule,
     ManualsModule,
+    BrandsModule,
   ],
 })
 export class AppModule implements NestModule {
