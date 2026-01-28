@@ -24,19 +24,20 @@ export class DeliveriesController {
     return this.deliveriesService.findAll(paginationDto);
   }
 
+  // IMPORTANTE: Rutas con path específico deben ir ANTES de rutas con parámetros
+  @Get('licitation/:licitationId')
+  @ApiOperation({ summary: 'Obtener entrega por licitación' })
+  @ApiResponse({ status: 200, description: 'Entrega de la licitación' })
+  async findByLicitation(@Param('licitationId', ParseIntPipe) licitationId: number) {
+    return this.deliveriesService.findByLicitation(licitationId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener una entrega por ID' })
   @ApiResponse({ status: 200, description: 'Entrega encontrada' })
   @ApiResponse({ status: 404, description: 'Entrega no encontrada' })
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.deliveriesService.findOne(id);
-  }
-
-  @Get('licitation/:licitationId')
-  @ApiOperation({ summary: 'Obtener entrega por licitación' })
-  @ApiResponse({ status: 200, description: 'Entrega de la licitación' })
-  async findByLicitation(@Param('licitationId', ParseIntPipe) licitationId: number) {
-    return this.deliveriesService.findByLicitation(licitationId);
   }
 
   @Get(':id/items')

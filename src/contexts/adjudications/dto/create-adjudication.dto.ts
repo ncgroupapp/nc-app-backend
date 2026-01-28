@@ -9,6 +9,11 @@ export class CreateAdjudicationItemDto {
   @IsNumber()
   productId?: number;
 
+  @ApiPropertyOptional({ description: 'Nombre del producto' })
+  @IsOptional()
+  @IsString()
+  productName?: string;
+
   @ApiProperty({ description: 'Cantidad adjudicada' })
   @IsNumber()
   @IsPositive()
