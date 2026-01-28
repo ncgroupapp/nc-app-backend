@@ -9,6 +9,7 @@ import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudicati
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { Product } from '@/contexts/products/entities/product.entity';
+import { Licitation, LicitationStatus } from '@/contexts/licitations/entities/licitation.entity';
 
 @Injectable()
 export class QuotationService {
@@ -19,6 +20,8 @@ export class QuotationService {
     private readonly quotationItemRepository: Repository<QuotationItem>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Licitation)
+    private readonly licitationRepository: Repository<Licitation>,
     private readonly adjudicationsService: AdjudicationsService,
   ) {}
 
@@ -188,6 +191,15 @@ export class QuotationService {
     });
 
     const savedQuotation = await this.quotationRepository.save(quotation);
+
+    // Si la cotización se finaliza, actualizar el estado de la licitación a QUOTED
+    if (savedQuotation.status === QuotationStatus.FINALIZED && savedQuotation.licitationId) {
+      const licitation = await this.licitationRepository.findOne({ where: { id: savedQuotation.licitationId } });
+      if (licitation && licitation.status === LicitationStatus.PENDING) {
+        licitation.status = LicitationStatus.QUOTED;
+        await this.licitationRepository.save(licitation);
+      }
+    }
 
     // Check if status changed to FINALIZED and trigger adjudication if needed
     // Note: This logic assumes that "Finalized" means we are ready to adjudicate.

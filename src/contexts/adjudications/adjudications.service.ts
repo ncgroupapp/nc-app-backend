@@ -5,7 +5,7 @@ import { Adjudication, AdjudicationStatus, AdjudicationItem } from './entities/a
 import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
 import { DeliveriesService } from '@/contexts/deliveries/deliveries.service';
 import { Quotation, QuotationItem, QuotationAwardStatus } from '@/contexts/quotation/entities/quotation.entity';
-import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
+import { Licitation, LicitationStatus } from '@/contexts/licitations/entities/licitation.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { Product } from '@/contexts/products/entities/product.entity';
@@ -145,7 +145,70 @@ export class AdjudicationsService {
     // Trigger Delivery Creation
     await this.deliveriesService.createFromAdjudication(savedAdjudication);
 
+    // Update Licitation Status
+    await this.updateLicitationStatus(savedAdjudication.licitationId);
+
     return savedAdjudication;
+  }
+
+  /**
+   * Recalcula y actualiza el estado de la licitación basado en sus adjudicaciones
+   */
+  private async updateLicitationStatus(licitationId: number): Promise<void> {
+    const licitation = await this.licitationRepository.findOne({
+      where: { id: licitationId },
+      relations: ['licitationProducts'],
+    });
+
+    if (!licitation) return;
+
+    // Obtener todas las adjudicaciones de esta licitación
+    const adjudications = await this.adjudicationRepository.find({
+      where: { licitationId },
+      relations: ['items'],
+    });
+
+    if (adjudications.length === 0) {
+      licitation.status = LicitationStatus.PENDING;
+      await this.licitationRepository.save(licitation);
+      return;
+    }
+
+    // Calcular cantidades totales adjudicadas por producto
+    const awardedQuantities = new Map<number, number>();
+    adjudications.forEach(adj => {
+      adj.items?.forEach(item => {
+        if (item.productId) {
+          const current = awardedQuantities.get(item.productId) || 0;
+          awardedQuantities.set(item.productId, current + item.quantity);
+        }
+      });
+    });
+
+    // Comparar con las cantidades solicitadas en la licitación
+    let allCompleted = true;
+    let someAwarded = false;
+
+    if (!licitation.licitationProducts || licitation.licitationProducts.length === 0) {
+      // Si no hay productos definidos, nos basamos solo en si hay adjudicaciones
+      licitation.status = adjudications.length > 0 ? LicitationStatus.PARTIAL_ADJUDICATION : LicitationStatus.PENDING;
+    } else {
+      for (const lp of licitation.licitationProducts) {
+        const awarded = awardedQuantities.get(lp.productId) || 0;
+        if (awarded > 0) someAwarded = true;
+        if (awarded < lp.quantity) allCompleted = false;
+      }
+
+      if (allCompleted) {
+        licitation.status = LicitationStatus.TOTAL_ADJUDICATION;
+      } else if (someAwarded) {
+        licitation.status = LicitationStatus.PARTIAL_ADJUDICATION;
+      } else {
+        licitation.status = LicitationStatus.PENDING;
+      }
+    }
+
+    await this.licitationRepository.save(licitation);
   }
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Adjudication>> {
@@ -237,14 +300,20 @@ export class AdjudicationsService {
     adjudication.totalPriceWithIVA = totalPriceWithIVA;
     adjudication.totalQuantity = totalQuantity;
 
-    await this.adjudicationRepository.save(adjudication);
+    const savedAdjudication = await this.adjudicationRepository.save(adjudication);
+    
+    // Update Licitation Status
+    await this.updateLicitationStatus(savedAdjudication.licitationId);
 
-    // Return updated adjudication with all items
-    return await this.findOne(adjudicationId);
+    return savedAdjudication;
   }
 
   async remove(id: number): Promise<void> {
     const adjudication = await this.findOne(id);
+    const licitationId = adjudication.licitationId;
     await this.adjudicationRepository.remove(adjudication);
+    
+    // Update Licitation Status after removal
+    await this.updateLicitationStatus(licitationId);
   }
 }

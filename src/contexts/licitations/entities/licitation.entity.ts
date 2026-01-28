@@ -14,6 +14,7 @@ import type { LicitationProduct } from "./licitation-product.entity";
 
 export enum LicitationStatus {
   PENDING = "Pending",
+  QUOTED = "Quoted",
   PARTIAL_ADJUDICATION = "Partial Adjudication",
   NOT_ADJUDICATED = "Not Adjudicated",
   TOTAL_ADJUDICATION = "Total Adjudication",
