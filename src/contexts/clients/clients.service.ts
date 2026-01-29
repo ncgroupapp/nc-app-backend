@@ -9,8 +9,9 @@ import { Repository, Brackets } from "typeorm";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
-import { FilterClientDto } from "./dto/filter-client.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { PaginationDto } from "../shared/dto/pagination.dto";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class ClientsService {
@@ -43,38 +44,24 @@ export class ClientsService {
     }
   }
 
-  async findAll(filterDto: FilterClientDto): Promise<PaginatedResult<Client>> {
-    const { page = 1, limit = 10, name, identifier, email } = filterDto;
+  async findAll(filterDto: PaginationDto): Promise<PaginatedResult<Client>> {
+    const { page = 1, limit = 10, search } = filterDto;
     this.logger.debug(
       `Finding clients with filters: ${JSON.stringify(filterDto)}`,
     );
-
-    const queryBuilder = this.clientRepository.createQueryBuilder("client");
-
-    if (name || identifier || email) {
-      queryBuilder.andWhere(
-        new Brackets((qb) => {
-          if (name) {
-            qb.orWhere("client.name ILIKE :name", { name: `%${name}%` });
-          }
-          if (identifier) {
-            qb.orWhere("client.identifier ILIKE :identifier", {
-              identifier: `%${identifier}%`,
-            });
-          }
-          if (email) {
-            qb.orWhere("client.contacts::text ILIKE :email", {
-              email: `%${email}%`,
-            });
-          }
-        }),
-      );
-    }
-
-    queryBuilder
+    
+    const queryBuilder = this.clientRepository
+      .createQueryBuilder("client")
       .orderBy("client.createdAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
+
+    if (search) {
+      queryBuilder.where(
+        'client.name ILIKE :search OR client.identifier ILIKE :search OR client.contacts::text ILIKE :search',
+        { search: `%${search}%` }
+      );
+    }
 
     const [data, total] = await queryBuilder.getManyAndCount();
 
@@ -95,9 +82,7 @@ export class ClientsService {
     const client = await this.clientRepository.findOne({ where: { id } });
     if (!client) {
       this.logger.warn(`Client with ID ${id} not found`);
-      throw new NotFoundException(
-        `Client with ID ${id} not found. Please verify the ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.CLIENTS.NOT_FOUND(id));
     }
     this.logger.debug(`Client found: ${client.identifier}`);
     return client;
@@ -157,9 +142,7 @@ export class ClientsService {
     const existingClient = await this.findByIdentifier(identifier);
     if (existingClient) {
       this.logger.warn(`Client with identifier ${identifier} already exists`);
-      throw new ConflictException(
-        `Client with identifier ${identifier} already exists. Please use a different identifier.`,
-      );
+      throw new ConflictException(ERROR_MESSAGES.CLIENTS.IDENTIFIER_ALREADY_EXISTS(identifier));
     }
   }
 }

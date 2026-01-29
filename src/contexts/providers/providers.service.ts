@@ -13,6 +13,7 @@ import { Provider } from "./entities/provider.entity";
 import { Product } from "../products/entities/product.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class ProvidersService {
@@ -86,9 +87,7 @@ export class ProvidersService {
     const provider = await this.providerRepository.findOne({ where: { id } });
     if (!provider) {
       this.logger.warn(`Provider with ID ${id} not found`);
-      throw new NotFoundException(
-        `Provider with ID ${id} not found. Please verify the ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND(id));
     }
     this.logger.debug(`Provider found: ${provider.rut}`);
     return provider;
@@ -144,9 +143,7 @@ export class ProvidersService {
       this.logger.warn(
         `Cannot delete provider ${id} because it has ${associatedProductsCount} associated products`,
       );
-      throw new ConflictException(
-        "No se puede eliminar el proveedor porque tiene productos asociados.",
-      );
+      throw new ConflictException(ERROR_MESSAGES.PROVIDERS.HAS_ASSOCIATED_PRODUCTS);
     }
 
     try {
@@ -167,9 +164,7 @@ export class ProvidersService {
     const existingProvider = await this.findByRut(rut);
     if (existingProvider) {
       this.logger.warn(`Provider with RUT ${rut} already exists`);
-      throw new ConflictException(
-        `Provider with RUT ${rut} already exists. Please use a different RUT.`,
-      );
+      throw new ConflictException(ERROR_MESSAGES.PROVIDERS.ALREADY_EXISTS(rut));
     }
   }
 
@@ -198,7 +193,7 @@ export class ProvidersService {
     const cleanRut = rut.replace(/[^0-9]/g, "");
 
     if (cleanRut.length !== 12) {
-      throw new BadRequestException("El RUT debe tener 12 dígitos.");
+      throw new BadRequestException(ERROR_MESSAGES.PROVIDERS.INVALID_RUT_LENGTH);
     }
 
     const digits = cleanRut.split("").map(Number);
@@ -219,13 +214,11 @@ export class ProvidersService {
 
     // Nota: El caso de que dé 10 se asume como inválido para este algoritmo estándar
     if (computedVerifier === 10) {
-      throw new BadRequestException("El RUT calculado es inválido.");
+      throw new BadRequestException(ERROR_MESSAGES.PROVIDERS.INVALID_RUT);
     }
 
     if (computedVerifier !== verifier) {
-      throw new BadRequestException(
-        "El RUT proporcionado no es válido (dígito verificador incorrecto).",
-      );
+      throw new BadRequestException(ERROR_MESSAGES.PROVIDERS.INVALID_RUT_DIGIT);
     }
   }
 }

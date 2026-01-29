@@ -13,6 +13,7 @@ import { Provider } from "@/contexts/providers/entities/provider.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { OfferFiltersDto } from "./dto/offer-filters.dto";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class OffersService {
@@ -114,9 +115,7 @@ export class OffersService {
     });
     if (!offer) {
       this.logger.warn(`Offer with ID ${id} not found`);
-      throw new NotFoundException(
-        `Offer with ID ${id} not found. Please verify the ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.OFFERS.NOT_FOUND(id));
     }
     this.logger.debug(`Offer found: ${offer.name}`);
     return offer;
@@ -190,9 +189,7 @@ export class OffersService {
     });
     if (!product) {
       this.logger.warn(`Product with ID ${productId} not found`);
-      throw new NotFoundException(
-        `Product with ID ${productId} not found. Please verify the product ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(productId));
     }
     return product;
   }
@@ -205,9 +202,7 @@ export class OffersService {
     });
     if (!provider) {
       this.logger.warn(`Provider with ID ${providerId} not found`);
-      throw new NotFoundException(
-        `Provider with ID ${providerId} not found. Please verify the provider ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND(providerId));
     }
     return provider;
   }

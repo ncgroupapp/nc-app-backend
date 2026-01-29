@@ -32,6 +32,17 @@ export class CreateProductDto {
   @IsOptional()
   model?: string;
 
+  @ApiProperty({ description: 'Product code', example: 'PROD-001', required: false })
+  @IsString()
+  @IsOptional()
+  code?: string;
+
+  @ApiProperty({ description: 'Equivalent codes', example: ['CODE1', 'CODE2'], required: false })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  equivalentCodes?: string[];
+
   @ApiProperty({ description: 'Stock quantity', example: 10, required: false, default: 0 })
   @IsNumber()
   @IsOptional()

@@ -31,6 +31,16 @@ export class FilterProductsDto {
   @IsString()
   model?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by code (partial match)', example: 'PROD-001' })
+  @IsOptional()
+  @IsString()
+  code?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by equivalent code (exact match in array)', example: 'CODE1' })
+  @IsOptional()
+  @IsString()
+  equivalentCode?: string;
+
   @ApiPropertyOptional({ description: 'Filter by details (partial match)', example: 'Intel Core i7' })
   @IsOptional()
   @IsString()

@@ -9,6 +9,7 @@ import { Licitation } from '../licitations/entities/licitation.entity';
 import { Provider } from '../providers/entities/provider.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class ImportsService {
@@ -28,7 +29,7 @@ export class ImportsService {
 
     const provider = await this.providerRepository.findOneBy({ id: providerId });
     if (!provider) {
-      throw new NotFoundException(`Provider with ID ${providerId} not found`);
+      throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND(providerId));
     }
 
     const newImport = this.importRepository.create({
@@ -98,7 +99,7 @@ export class ImportsService {
     });
 
     if (!importEntity) {
-      throw new NotFoundException(`Import with ID ${id} not found`);
+      throw new NotFoundException(ERROR_MESSAGES.IMPORTS.NOT_FOUND(id));
     }
 
     return importEntity;
@@ -111,7 +112,7 @@ export class ImportsService {
     if (providerId) {
       const provider = await this.providerRepository.findOneBy({ id: providerId });
       if (!provider) {
-        throw new NotFoundException(`Provider with ID ${providerId} not found`);
+        throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND(providerId));
       }
       importEntity.provider = provider;
     }

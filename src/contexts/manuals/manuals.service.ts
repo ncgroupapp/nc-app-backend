@@ -6,6 +6,7 @@ import { UpdateManualDto } from './dto/update-manual.dto';
 import { Manual } from './entities/manual.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class ManualsService {
@@ -45,7 +46,7 @@ export class ManualsService {
   async findOne(id: number) {
     const manual = await this.manualRepository.findOneBy({ id });
     if (!manual) {
-      throw new NotFoundException(`Manual with ID ${id} not found`);
+      throw new NotFoundException(ERROR_MESSAGES.MANUALS.NOT_FOUND(id));
     }
     return manual;
   }

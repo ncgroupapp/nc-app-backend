@@ -14,6 +14,7 @@ import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
 export class LicitationsService {
@@ -156,9 +157,7 @@ export class LicitationsService {
     });
     if (!licitation) {
       this.logger.warn(`Licitation with ID ${id} not found`);
-      throw new NotFoundException(
-        `Licitation with ID ${id} not found. Please verify the ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.LICITATIONS.NOT_FOUND(id));
     }
     this.logger.debug(`Licitation found: ${licitation.callNumber}`);
     return licitation;
@@ -259,9 +258,7 @@ export class LicitationsService {
       this.logger.warn(
         `Invalid date range: deadline ${deadlineDateString} must be after start ${startDateString}`,
       );
-      throw new BadRequestException(
-        `Invalid date range: deadline date (${deadlineDateString}) must be after start date (${startDateString})`,
-      );
+      throw new BadRequestException(ERROR_MESSAGES.LICITATIONS.INVALID_DATE_RANGE);
     }
   }
 
@@ -271,9 +268,7 @@ export class LicitationsService {
     });
     if (!client) {
       this.logger.warn(`Client with ID ${clientId} not found`);
-      throw new NotFoundException(
-        `Client with ID ${clientId} not found. Please verify the client ID and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.CLIENTS.NOT_FOUND(clientId));
     }
     return client;
   }
@@ -283,9 +278,7 @@ export class LicitationsService {
   ): Promise<Product[]> {
     if (productIds.length === 0) {
       this.logger.warn("No products provided for licitation");
-      throw new BadRequestException(
-        "At least one product is required to create a licitation",
-      );
+      throw new BadRequestException(ERROR_MESSAGES.LICITATIONS.PRODUCT_REQUIRED);
     }
 
     const products = await this.productRepository.findBy({
@@ -298,9 +291,7 @@ export class LicitationsService {
       this.logger.warn(
         `Products with IDs [${missingIds.join(", ")}] not found. Found products: [${foundIds.join(", ")}]`,
       );
-      throw new NotFoundException(
-        `Products with IDs [${missingIds.join(", ")}] not found. Please verify the product IDs and try again.`,
-      );
+      throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND_MANY(missingIds.join(", ")));
     }
 
     return products;

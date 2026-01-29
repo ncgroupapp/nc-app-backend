@@ -31,6 +31,12 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true })
   model?: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  code?: string;
+
+  @Column('text', { array: true, nullable: true })
+  equivalentCodes?: string[];
+
   @Column({ type: 'int', nullable: true, default: 0 })
   stockQuantity?: number;
 
@@ -58,9 +64,6 @@ export class Product {
   // Legacy fields for backward compatibility
   @Column({ type: 'text', nullable: true })
   description?: string;
-
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  price?: number;
 
   @Column({ type: 'int', nullable: true, default: 0 })
   stock?: number;

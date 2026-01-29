@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Query,
   Logger,
+  UseInterceptors,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -22,11 +23,13 @@ import { ClientsService } from "./clients.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
-import { FilterClientDto } from "./dto/filter-client.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
+import { PaginationDto } from "../shared/dto/pagination.dto";
 
 @ApiTags("clients")
 @Controller("clients")
+@UseInterceptors(TransformInterceptor)
 export class ClientsController {
   private readonly logger = new Logger(ClientsController.name);
 
@@ -53,7 +56,7 @@ export class ClientsController {
     description: "List of clients",
     type: [Client],
   })
-  async findAll(@Query() filterDto: FilterClientDto): Promise<PaginatedResult<Client>> {
+  async findAll(@Query() filterDto: PaginationDto): Promise<PaginatedResult<Client>> {
     this.logger.debug(`GET /clients with filters: ${JSON.stringify(filterDto)}`);
     return this.clientsService.findAll(filterDto);
   }

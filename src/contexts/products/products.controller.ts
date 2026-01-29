@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, ParseIntPipe, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, ParseIntPipe, Query, Logger, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -7,9 +7,11 @@ import { FilterProductsDto } from './dto/filter-products.dto';
 import { Product } from './entities/product.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags('products')
 @Controller('products')
+@UseInterceptors(TransformInterceptor)
 export class ProductsController {
   private readonly logger = new Logger(ProductsController.name);
 

@@ -1,13 +1,15 @@
-import { Controller, Get, Post, Body, Param, Query, Delete, HttpCode, HttpStatus, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Delete, HttpCode, HttpStatus, Patch, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { AdjudicationsService } from './adjudications.service';
 import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
 import { AddAdjudicationItemDto } from './dto/add-adjudication-item.dto';
 import { Adjudication } from './entities/adjudication.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
+import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags('adjudications')
 @Controller('adjudications')
+@UseInterceptors(TransformInterceptor)
 export class AdjudicationsController {
   constructor(private readonly adjudicationsService: AdjudicationsService) {}
 
