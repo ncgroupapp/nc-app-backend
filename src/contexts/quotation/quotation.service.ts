@@ -158,22 +158,32 @@ export class QuotationService {
 
       // Crear nuevos items
       quotation.items = await Promise.all(updateQuotationDto.items.map(async (item) => {
-        // Usar productName del DTO directamente, o buscarlo por productId como fallback
+        // Usar productName, brand, origin del DTO si existen, o buscarlos por productId
         let productName = item.productName;
-        if (!productName && item.productId) {
+        let brand = item.brand;
+        let origin = item.origin;
+
+        if ((!productName || !brand || !origin) && item.productId) {
           const product = await this.productRepository.findOne({ where: { id: item.productId } });
-          if (!product) {
+          if (product) {
+            if (!productName) productName = product.name;
+            if (!brand) brand = product.brand;
+            if (!origin) origin = product.origin;
+          } else if (!productName) {
             throw new NotFoundException(`Producto con ID ${item.productId} no encontrado`);
           }
-          productName = product.name;
         }
+
         if (!productName) {
           throw new NotFoundException('Se requiere productName o un productId válido');
         }
+
         return this.quotationItemRepository.create({ 
           ...item, 
           quotationId: id,
           productName,
+          brand,
+          origin,
         });
       }));
     }

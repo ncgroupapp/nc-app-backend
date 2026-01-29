@@ -29,6 +29,16 @@ export class CreateQuotationItemDto {
   @IsString()
   productName!: string;
 
+  @ApiPropertyOptional({ description: 'Marca del producto' })
+  @IsOptional()
+  @IsString()
+  brand?: string;
+
+  @ApiPropertyOptional({ description: 'Origen del producto' })
+  @IsOptional()
+  @IsString()
+  origin?: string;
+
 
   @ApiPropertyOptional({ description: 'ID del proveedor (si existe en el sistema)' })
   @IsOptional()

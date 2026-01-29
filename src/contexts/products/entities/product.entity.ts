@@ -11,6 +11,9 @@ export class Product {
   @Column({ type: 'varchar', length: 255 })
   name!: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  origin?: string;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   image?: string;
 
