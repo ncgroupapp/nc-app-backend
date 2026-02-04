@@ -28,6 +28,44 @@ export class AdjudicationsService {
     private readonly deliveriesService: DeliveriesService,
   ) {}
 
+  async findByClient(clientId: number): Promise<Adjudication[]> {
+    return this.adjudicationRepository.find({
+      relations: ['quotation', 'items', 'items.product'],
+      where: {
+        quotation: {
+          clientId: clientId,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findByProduct(productId: number): Promise<Adjudication[]> {
+    return this.adjudicationRepository.find({
+      relations: ['quotation', 'items', 'items.product'],
+      where: {
+        items: {
+          productId: productId,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findByProvider(providerId: number): Promise<Adjudication[]> {
+    return this.adjudicationRepository.find({
+      relations: ['quotation', 'quotation.items', 'items', 'items.product'],
+      where: {
+        quotation: {
+          items: {
+            providerId: providerId,
+          },
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async create(createAdjudicationDto: CreateAdjudicationDto): Promise<Adjudication> {
     // Validate that quotation exists
     const quotation = await this.quotationRepository.findOne({

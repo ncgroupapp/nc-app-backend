@@ -233,6 +233,30 @@ export class QuotationService {
     });
   }
 
+  async findByProduct(productId: number): Promise<Quotation[]> {
+    return await this.quotationRepository.find({
+      relations: ['items'],
+      where: {
+        items: {
+          productId: productId,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findByProvider(providerId: number): Promise<Quotation[]> {
+    return await this.quotationRepository.find({
+      relations: ['items'],
+      where: {
+        items: {
+          providerId: providerId,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async getTotalsByQuotation(id: number): Promise<{
     totalWithoutIVA: number;
     totalWithIVA: number;
