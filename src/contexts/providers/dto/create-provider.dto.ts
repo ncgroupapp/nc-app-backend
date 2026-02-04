@@ -7,6 +7,7 @@ import {
   IsEmail,
   IsOptional,
   ArrayMinSize,
+  IsNumber,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { IsUruguayRut } from "@/contexts/shared/validators/is-uruguay-rut.validator";
@@ -66,6 +67,15 @@ export class CreateProviderDto {
   @IsString()
   @IsNotEmpty()
   country!: string;
+
+  @ApiProperty({
+    description: "Provider brand ID",
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  brand_id?: number;
 
   @ApiProperty({
     description: "Provider contacts",

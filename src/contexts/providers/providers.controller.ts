@@ -64,16 +64,23 @@ export class ProvidersController {
     description: "Filter by RUT",
     type: String,
   })
+  @ApiQuery({
+    name: "brand",
+    required: false,
+    description: "Filter by Brand",
+    type: String,
+  })
   async findAll(
     @Query() paginationDto: PaginationDto,
-    @Query("rut") rut?: string
+    @Query("rut") rut?: string,
+    @Query("brand") brand?: string
   ): Promise<PaginatedResult<Provider> | Provider[]> {
-    this.logger.debug(`GET /providers${rut ? `?rut=${rut}` : ""}`);
+    this.logger.debug(`GET /providers${rut ? `?rut=${rut}` : ""}${brand ? `?brand=${brand}` : ""}`);
     if (rut) {
       const provider = await this.providersService.findByRut(rut);
       return provider ? [provider] : [];
     }
-    return this.providersService.findAll(paginationDto);
+    return this.providersService.findAll(paginationDto, { brand });
   }
 
   @Get(":id")
