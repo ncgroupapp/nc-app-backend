@@ -64,6 +64,7 @@ export class DeliveriesService {
 
   /**
    * Agrega items a una entrega desde una adjudicación
+   * Si ya existe un item para el mismo producto, actualiza la cantidad en lugar de crear duplicados
    */
   async addItemsFromAdjudication(adjudication: Adjudication): Promise<Delivery> {
     const delivery = await this.findOrCreateByLicitation(adjudication.licitationId);
@@ -72,19 +73,34 @@ export class DeliveriesService {
     const estimatedDate = new Date();
     estimatedDate.setDate(estimatedDate.getDate() + 7);
 
-    // Crear DeliveryItems para cada AdjudicationItem
+    // Crear o actualizar DeliveryItems para cada AdjudicationItem
     if (adjudication.items && adjudication.items.length > 0) {
       for (const adjItem of adjudication.items) {
-        const deliveryItem = this.deliveryItemRepository.create({
-          deliveryId: delivery.id,
-          productId: adjItem.productId,
-          productCode: adjItem.productName || `PROD-${adjItem.productId}`,
-          productName: adjItem.productName || 'Producto',
-          quantity: adjItem.quantity,
-          status: DeliveryItemStatus.PENDING,
-          estimatedDate,
+        // Buscar si ya existe un DeliveryItem para este producto
+        const existingItem = await this.deliveryItemRepository.findOne({
+          where: { 
+            deliveryId: delivery.id, 
+            productId: adjItem.productId 
+          }
         });
-        await this.deliveryItemRepository.save(deliveryItem);
+
+        if (existingItem) {
+          // Si existe, actualizar la cantidad (reemplazar, no sumar)
+          existingItem.quantity = adjItem.quantity;
+          await this.deliveryItemRepository.save(existingItem);
+        } else {
+          // Si no existe, crear nuevo
+          const deliveryItem = this.deliveryItemRepository.create({
+            deliveryId: delivery.id,
+            productId: adjItem.productId,
+            productCode: adjItem.productName || `PROD-${adjItem.productId}`,
+            productName: adjItem.productName || 'Producto',
+            quantity: adjItem.quantity,
+            status: DeliveryItemStatus.PENDING,
+            estimatedDate,
+          });
+          await this.deliveryItemRepository.save(deliveryItem);
+        }
       }
     }
 

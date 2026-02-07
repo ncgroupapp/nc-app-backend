@@ -316,4 +316,66 @@ export class AdjudicationsService {
     // Update Licitation Status after removal
     await this.updateLicitationStatus(licitationId);
   }
+
+  /**
+   * Actualiza la cantidad adjudicada de un item de cotización
+   * También actualiza la cantidad en el DeliveryItem correspondiente
+   */
+  async updateAwardedQuantity(
+    quotationItemId: number, 
+    newQuantity: number
+  ): Promise<QuotationItem> {
+    const quotationItem = await this.quotationItemRepository.findOne({
+      where: { id: quotationItemId },
+      relations: ['quotation'],
+    });
+
+    if (!quotationItem) {
+      throw new NotFoundException(
+        `Item de cotización con ID ${quotationItemId} no encontrado`,
+      );
+    }
+
+    // Actualizar la cantidad adjudicada
+    quotationItem.awardedQuantity = newQuantity;
+
+    // Actualizar el estado según la cantidad
+    if (newQuantity >= quotationItem.quantity) {
+      quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
+    } else if (newQuantity > 0) {
+      quotationItem.awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
+    } else {
+      quotationItem.awardStatus = QuotationAwardStatus.PENDING;
+    }
+
+    await this.quotationItemRepository.save(quotationItem);
+
+    // Buscar y actualizar el DeliveryItem correspondiente
+    const quotation = quotationItem.quotation;
+    if (quotation) {
+      // Buscar la entrega de esta licitación
+      if (!quotation.licitationId) return quotationItem;
+      const delivery = await this.deliveriesService.findByLicitation(quotation.licitationId);
+      if (delivery) {
+        // Buscar el item de entrega para este producto
+        const deliveryItem = delivery.items?.find(
+          (item) => item.productId === quotationItem.productId
+        );
+        if (deliveryItem) {
+          await this.deliveriesService.updateItemStatus(
+            delivery.id, 
+            deliveryItem.id, 
+            { quantity: newQuantity }
+          );
+        }
+      }
+    }
+
+    // Actualizar estado de la licitación si es necesario
+    if (quotation && quotation.licitationId) {
+      await this.updateLicitationStatus(quotation.licitationId);
+    }
+
+    return quotationItem;
+  }
 }

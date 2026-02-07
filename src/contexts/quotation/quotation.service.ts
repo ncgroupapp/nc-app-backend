@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
-import { Quotation, QuotationItem, QuotationStatus } from './entities/quotation.entity';
+import { Quotation, QuotationItem, QuotationStatus, QuotationAwardStatus } from './entities/quotation.entity';
 import { AdjudicationsService } from '@/contexts/adjudications/adjudications.service';
 import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudication.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
@@ -173,12 +173,24 @@ export class QuotationService {
           throw new NotFoundException('Se requiere productName o un productId válido');
         }
 
+        // Recalcular awardStatus si el item tiene awardedQuantity
+        let awardStatus = item.awardStatus;
+        if (item.awardedQuantity !== undefined && item.awardedQuantity > 0) {
+          if (item.awardedQuantity >= item.quantity) {
+            awardStatus = QuotationAwardStatus.AWARDED;
+          } else {
+            awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
+          }
+        }
+        console.log('Recalculated awardStatus:', awardStatus);
+
         return this.quotationItemRepository.create({ 
           ...item, 
           quotationId: id,
           productName,
           brand,
           origin,
+          awardStatus,
         });
       }));
     }
