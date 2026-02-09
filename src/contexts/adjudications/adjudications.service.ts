@@ -51,14 +51,22 @@ export class AdjudicationsService {
       );
     }
 
-    // Calculate totals
-    let totalPriceWithoutIVA = 0;
-    let totalPriceWithIVA = 0; 
-    let totalQuantity = 0;
+    // Check if an adjudication already exists for this licitation and quotation
+    let existingAdjudication = await this.adjudicationRepository.findOne({
+      where: {
+        licitationId: createAdjudicationDto.licitationId,
+        quotationId: createAdjudicationDto.quotationId,
+      },
+      relations: ['items'],
+    });
 
-    const items = await Promise.all(createAdjudicationDto.items.map(async (itemDto) => {
-      totalQuantity += itemDto.quantity;
-      totalPriceWithoutIVA += itemDto.unitPrice * itemDto.quantity;
+    // Calculate totals for new items
+    let newTotalPriceWithoutIVA = 0;
+    let newTotalQuantity = 0;
+
+    const newItems = await Promise.all(createAdjudicationDto.items.map(async (itemDto) => {
+      newTotalQuantity += itemDto.quantity;
+      newTotalPriceWithoutIVA += itemDto.unitPrice * itemDto.quantity;
 
       // Update Quotation Item Status
       if (itemDto.productId) {
@@ -91,7 +99,7 @@ export class AdjudicationsService {
         await this.productRepository.save(product);
       }
 
-      return this.adjudicationItemRepository.create(itemDto);
+      return itemDto; // Return DTO directly, will create entity when saving
     }));
 
     // Process Non-Awarded Items
@@ -129,21 +137,83 @@ export class AdjudicationsService {
         }
       }));
     }
-    
-    totalPriceWithIVA = totalPriceWithoutIVA * 1.19; // Default IVA 19%
 
-    const adjudication = this.adjudicationRepository.create({
-      ...createAdjudicationDto,
-      totalPriceWithoutIVA,
-      totalPriceWithIVA,
-      totalQuantity,
-      items,
-    });
+    let savedAdjudication: Adjudication;
 
-    const savedAdjudication = await this.adjudicationRepository.save(adjudication);
+    if (existingAdjudication) {
+      // Check for existing items and update or create
+      for (const newItem of newItems) {
+        // Check if item with same productId already exists
+        const existingItem = existingAdjudication.items?.find(
+          item => item.productId === newItem.productId
+        );
 
-    // Trigger Delivery Creation
-    await this.deliveriesService.createFromAdjudication(savedAdjudication);
+        if (existingItem) {
+          // Update existing item - replace quantity and price (not accumulate)
+          existingItem.quantity = newItem.quantity;
+          existingItem.unitPrice = newItem.unitPrice;
+          if (newItem.productName) existingItem.productName = newItem.productName;
+          await this.adjudicationItemRepository.save(existingItem);
+        } else {
+          // Create new item only if productId doesn't exist
+          const itemToSave = this.adjudicationItemRepository.create({
+            ...newItem,
+            adjudicationId: existingAdjudication.id,
+          });
+          await this.adjudicationItemRepository.save(itemToSave);
+        }
+      }
+
+      savedAdjudication = await this.adjudicationRepository.save(existingAdjudication);
+      
+      // Reload adjudication with updated items for delivery processing
+      savedAdjudication = await this.adjudicationRepository.findOne({
+        where: { id: savedAdjudication.id },
+        relations: ['items'],
+      }) || savedAdjudication;
+
+      // Recalculate totals from actual items
+      const allItems = savedAdjudication.items || [];
+      savedAdjudication.totalQuantity = allItems.reduce((sum, item) => sum + item.quantity, 0);
+      savedAdjudication.totalPriceWithoutIVA = allItems.reduce((sum, item) => sum + (item.quantity * Number(item.unitPrice)), 0);
+      savedAdjudication.totalPriceWithIVA = savedAdjudication.totalPriceWithoutIVA * 1.19;
+      
+      savedAdjudication = await this.adjudicationRepository.save(savedAdjudication);
+
+      // Add new items to delivery
+      await this.deliveriesService.addItemsFromAdjudication(savedAdjudication);
+    } else {
+      // Create new adjudication (WITHOUT items first to get ID)
+      const newTotalPriceWithIVA = newTotalPriceWithoutIVA * 1.19;
+
+      const adjudication = this.adjudicationRepository.create({
+        ...createAdjudicationDto,
+        totalPriceWithoutIVA: newTotalPriceWithoutIVA,
+        totalPriceWithIVA: newTotalPriceWithIVA,
+        totalQuantity: newTotalQuantity,
+        items: [], // Save without items first
+      });
+
+      savedAdjudication = await this.adjudicationRepository.save(adjudication);
+
+      // Now save items with the correct adjudicationId
+      for (const newItem of newItems) {
+        const itemToSave = this.adjudicationItemRepository.create({
+          ...newItem,
+          adjudicationId: savedAdjudication.id,
+        });
+        await this.adjudicationItemRepository.save(itemToSave);
+      }
+
+      // Reload with items
+      savedAdjudication = await this.adjudicationRepository.findOne({
+        where: { id: savedAdjudication.id },
+        relations: ['items'],
+      }) || savedAdjudication;
+
+      // Trigger Delivery Creation for new adjudications
+      await this.deliveriesService.createFromAdjudication(savedAdjudication);
+    }
 
     // Update Licitation Status
     await this.updateLicitationStatus(savedAdjudication.licitationId);
