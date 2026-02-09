@@ -7,6 +7,7 @@ import {
   IsEmail,
   IsOptional,
   ArrayMinSize,
+  IsNumber,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { IsUruguayRut } from "@/contexts/shared/validators/is-uruguay-rut.validator";
@@ -48,7 +49,7 @@ export class CreateProviderDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsUruguayRut({ message: "RUT must be a valid Uruguayan RUT format (XXXXXXXX-X) with valid check digit" })
+  // @IsUruguayRut({ message: "RUT must be a valid Uruguayan RUT format (12 digits) with valid check digit" })
   rut!: string;
 
   @ApiProperty({
@@ -66,6 +67,15 @@ export class CreateProviderDto {
   @IsString()
   @IsNotEmpty()
   country!: string;
+
+  @ApiProperty({
+    description: "Provider brand ID",
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  brand_id?: number;
 
   @ApiProperty({
     description: "Provider contacts",

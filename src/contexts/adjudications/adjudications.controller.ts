@@ -71,6 +71,39 @@ export class AdjudicationsController {
     return this.adjudicationsService.findAll(paginationDto);
   }
 
+  @Get('by-client/:clientId')
+  @ApiOperation({ summary: 'Obtener adjudicaciones por cliente' })
+  @ApiParam({ name: 'clientId', description: 'ID del cliente' })
+  @ApiResponse({
+    status: 200,
+    description: 'Adjudicaciones encontradas',
+  })
+  findByClient(@Param('clientId') clientId: string) {
+    return this.adjudicationsService.findByClient(+clientId);
+  }
+
+  @Get('by-product/:productId')
+  @ApiOperation({ summary: 'Obtener adjudicaciones por producto' })
+  @ApiParam({ name: 'productId', description: 'ID del producto' })
+  @ApiResponse({
+    status: 200,
+    description: 'Adjudicaciones encontradas',
+  })
+  findByProduct(@Param('productId') productId: string) {
+    return this.adjudicationsService.findByProduct(+productId);
+  }
+
+  @Get('by-provider/:providerId')
+  @ApiOperation({ summary: 'Obtener adjudicaciones por proveedor' })
+  @ApiParam({ name: 'providerId', description: 'ID del proveedor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Adjudicaciones encontradas',
+  })
+  findByProvider(@Param('providerId') providerId: string) {
+    return this.adjudicationsService.findByProvider(+providerId);
+  }
+
   @Get('quotation/:quotationId')
   @ApiOperation({ summary: 'Obtener adjudicaciones por ID de cotización' })
   @ApiParam({ name: 'quotationId', description: 'ID de la cotización' })

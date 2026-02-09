@@ -81,6 +81,39 @@ export class QuotationController {
     return this.quotationService.findAll(paginationDto);
   }
 
+  @Get("by-client/:clientId")
+  @ApiOperation({ summary: "Obtener cotizaciones por cliente" })
+  @ApiParam({ name: "clientId", description: "ID del cliente" })
+  @ApiResponse({
+    status: 200,
+    description: "Cotizaciones encontradas",
+  })
+  findByClient(@Param("clientId") clientId: string) {
+    return this.quotationService.findByClient(+clientId);
+  }
+
+  @Get("by-product/:productId")
+  @ApiOperation({ summary: "Obtener cotizaciones por producto" })
+  @ApiParam({ name: "productId", description: "ID del producto" })
+  @ApiResponse({
+    status: 200,
+    description: "Cotizaciones encontradas",
+  })
+  findByProduct(@Param("productId") productId: string) {
+    return this.quotationService.findByProduct(+productId);
+  }
+
+  @Get("by-provider/:providerId")
+  @ApiOperation({ summary: "Obtener cotizaciones por proveedor" })
+  @ApiParam({ name: "providerId", description: "ID del proveedor" })
+  @ApiResponse({
+    status: 200,
+    description: "Cotizaciones encontradas",
+  })
+  findByProvider(@Param("providerId") providerId: string) {
+    return this.quotationService.findByProvider(+providerId);
+  }
+
   @Get("identifier/:identifier")
   @ApiOperation({ summary: "Obtener cotización por identificador" })
   @ApiParam({

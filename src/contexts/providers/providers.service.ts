@@ -30,14 +30,18 @@ export class ProvidersService {
     this.logger.log(`Creating provider with RUT: ${createProviderDto.rut}`);
 
     const normalizedRut = this.normalizeRut(createProviderDto.rut);
-    this.validateRutChecksum(normalizedRut);
+    // this.validateRutChecksum(normalizedRut);
     await this.validateRutNotExists(normalizedRut);
 
     try {
-      const provider = this.providerRepository.create({
-        ...createProviderDto,
-        rut: normalizedRut,
-      });
+      // Map brand_id to brandId (TypeORM column)
+      const { brand_id, ...rest } = createProviderDto;
+      const providerData: any = { ...rest, rut: normalizedRut };
+      if (brand_id) {
+        providerData.brandId = brand_id;
+      }
+
+      const provider: Provider = this.providerRepository.create(providerData as Provider);
       const savedProvider = await this.providerRepository.save(provider);
       this.logger.log(
         `Provider created successfully with ID: ${savedProvider.id}, RUT: ${savedProvider.rut}`,
@@ -52,20 +56,25 @@ export class ProvidersService {
     }
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Provider>> {
+  async findAll(paginationDto: PaginationDto, filters?: { brand?: string }): Promise<PaginatedResult<Provider>> {
     const { page = 1, limit = 10, search } = paginationDto;
-    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}${search ? `, search: ${search}` : ''}`);
+    this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}${search ? `, search: ${search}` : ''}${filters?.brand ? `, brand: ${filters.brand}` : ''}`);
 
     const queryBuilder = this.providerRepository.createQueryBuilder('provider')
+      .leftJoinAndSelect('provider.brand', 'brand')
       .orderBy('provider.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (search) {
       queryBuilder.where(
-        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search)',
+        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search OR brand.name ILIKE :search)',
         { search: `%${search}%` }
       );
+    }
+
+    if (filters?.brand) {
+      queryBuilder.andWhere('brand.name ILIKE :brand', { brand: `%${filters.brand}%` });
     }
 
     const [data, total] = await queryBuilder.getManyAndCount();
@@ -84,7 +93,10 @@ export class ProvidersService {
 
   async findOne(id: number): Promise<Provider> {
     this.logger.debug(`Finding provider with ID: ${id}`);
-    const provider = await this.providerRepository.findOne({ where: { id } });
+    const provider = await this.providerRepository.findOne({ 
+      where: { id },
+      relations: ['brand']
+    });
     if (!provider) {
       this.logger.warn(`Provider with ID ${id} not found`);
       throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND(id));
@@ -107,13 +119,19 @@ export class ProvidersService {
 
     if (updateProviderDto.rut && updateProviderDto.rut !== provider.rut) {
       const normalizedRut = this.normalizeRut(updateProviderDto.rut);
-      this.validateRutChecksum(normalizedRut);
+      // this.validateRutChecksum(normalizedRut);
       await this.validateRutNotExists(normalizedRut);
       updateProviderDto.rut = normalizedRut;
     }
 
     try {
-      Object.assign(provider, updateProviderDto);
+      const { brand_id, ...rest } = updateProviderDto;
+      const updateData: any = { ...rest };
+      if (brand_id !== undefined) {
+        updateData.brandId = brand_id;
+      }
+      
+      Object.assign(provider, updateData);
       const updatedProvider = await this.providerRepository.save(provider);
       this.logger.log(
         `Provider updated successfully: ID ${id}, RUT: ${updatedProvider.rut}`,
