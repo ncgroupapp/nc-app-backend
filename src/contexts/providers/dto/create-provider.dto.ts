@@ -49,7 +49,7 @@ export class CreateProviderDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsUruguayRut({ message: "RUT must be a valid Uruguayan RUT format (XXXXXXXX-X) with valid check digit" })
+  // @IsUruguayRut({ message: "RUT must be a valid Uruguayan RUT format (12 digits) with valid check digit" })
   rut!: string;
 
   @ApiProperty({

@@ -30,7 +30,7 @@ export class ProvidersService {
     this.logger.log(`Creating provider with RUT: ${createProviderDto.rut}`);
 
     const normalizedRut = this.normalizeRut(createProviderDto.rut);
-    this.validateRutChecksum(normalizedRut);
+    // this.validateRutChecksum(normalizedRut);
     await this.validateRutNotExists(normalizedRut);
 
     try {
@@ -41,7 +41,7 @@ export class ProvidersService {
         providerData.brandId = brand_id;
       }
 
-      const provider = this.providerRepository.create(providerData);
+      const provider: Provider = this.providerRepository.create(providerData as Provider);
       const savedProvider = await this.providerRepository.save(provider);
       this.logger.log(
         `Provider created successfully with ID: ${savedProvider.id}, RUT: ${savedProvider.rut}`,
@@ -119,7 +119,7 @@ export class ProvidersService {
 
     if (updateProviderDto.rut && updateProviderDto.rut !== provider.rut) {
       const normalizedRut = this.normalizeRut(updateProviderDto.rut);
-      this.validateRutChecksum(normalizedRut);
+      // this.validateRutChecksum(normalizedRut);
       await this.validateRutNotExists(normalizedRut);
       updateProviderDto.rut = normalizedRut;
     }
