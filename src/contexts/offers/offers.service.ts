@@ -12,6 +12,7 @@ import { Product } from "@/contexts/products/entities/product.entity";
 import { Provider } from "@/contexts/providers/entities/provider.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
+import { OfferFiltersDto } from "./dto/offer-filters.dto";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
@@ -58,19 +59,42 @@ export class OffersService {
     }
   }
 
-  async findAll(paginationDto: PaginationDto, productId?: number): Promise<PaginatedResult<Offer>> {
-    const { page = 1, limit = 10 } = paginationDto;
+  async findAll(
+    paginationDto: OfferFiltersDto,
+    productIdArg?: number,
+  ): Promise<PaginatedResult<Offer>> {
+    const { page = 1, limit = 10, search, productId, providerId } = paginationDto;
+    // Prioritize argument but fallback to DTO
+    const finalProductId = productIdArg || productId;
+
     this.logger.debug(
-      `Finding all offers${productId ? ` for product ID: ${productId}` : ""}`,
+      `Finding all offers with filters: ${JSON.stringify({ search, productId: finalProductId, providerId })}`,
     );
-    const where = productId ? { productId } : {};
-    const [data, total] = await this.offerRepository.findAndCount({
-      where,
-      relations: ["product", "provider"],
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+
+    const query = this.offerRepository.createQueryBuilder("offer")
+      .leftJoinAndSelect("offer.product", "product")
+      .leftJoinAndSelect("offer.provider", "provider")
+      .orderBy("offer.createdAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (finalProductId) {
+      query.andWhere("offer.productId = :productId", { productId: finalProductId });
+    }
+
+    if (providerId) {
+      query.andWhere("offer.providerId = :providerId", { providerId });
+    }
+
+    if (search) {
+      query.andWhere(
+        "(offer.name ILIKE :search OR product.name ILIKE :search OR provider.name ILIKE :search)",
+        { search: `%${search}%` },
+      );
+    }
+
+    const [data, total] = await query.getManyAndCount();
+
     this.logger.log(`Found ${data.length} offers`);
     return {
       data,

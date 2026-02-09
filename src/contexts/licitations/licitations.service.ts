@@ -6,9 +6,10 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
-import { CreateLicitationDto } from "./dto/create-licitation.dto";
+import { CreateLicitationDto, ProductWithQuantityDto } from "./dto/create-licitation.dto";
 import { UpdateLicitationDto } from "./dto/update-licitation.dto";
 import { Licitation, LicitationStatus } from "./entities/licitation.entity";
+import { LicitationProduct } from "./entities/licitation-product.entity";
 import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
@@ -22,6 +23,8 @@ export class LicitationsService {
   constructor(
     @InjectRepository(Licitation)
     private readonly licitationRepository: Repository<Licitation>,
+    @InjectRepository(LicitationProduct)
+    private readonly licitationProductRepository: Repository<LicitationProduct>,
     @InjectRepository(Client)
     private readonly clientRepository: Repository<Client>,
     @InjectRepository(Product)
@@ -34,7 +37,7 @@ export class LicitationsService {
     this.logger.log(
       `Creating licitation with call number: ${createLicitationDto.callNumber}, internal number: ${createLicitationDto.internalNumber}`,
     );
-    const { clientId, productIds, startDate, deadlineDate, ...licitationData } =
+    const { clientId, products, productIds, startDate, deadlineDate, ...licitationData } =
       createLicitationDto;
 
     const start = new Date(startDate);
@@ -42,23 +45,41 @@ export class LicitationsService {
     this.validateDateRange(start, deadline, startDate, deadlineDate);
 
     const client = await this.validateClientExists(clientId);
-    const products = await this.validateProductsExist(productIds);
+    
+    // Determine products to add - support both new format (products) and legacy (productIds)
+    const productsWithQuantity = this.normalizeProductsInput(products, productIds);
+    await this.validateProductsExist(productsWithQuantity.map(p => p.productId));
 
     try {
-      const licitation = this.buildLicitationEntity(
-        licitationData,
-        start,
-        deadline,
+      // Create and save licitation first
+      const licitation = this.licitationRepository.create({
+        ...licitationData,
+        startDate: start,
+        deadlineDate: deadline,
         client,
-        products,
-        createLicitationDto.status,
-      );
+        clientId,
+        status: createLicitationDto.status || LicitationStatus.PENDING,
+      });
 
       const savedLicitation = await this.licitationRepository.save(licitation);
+
+      // Create licitation products with quantities
+      const licitationProducts = productsWithQuantity.map(({ productId, quantity }) =>
+        this.licitationProductRepository.create({
+          licitationId: savedLicitation.id,
+          productId,
+          quantity: quantity || 1,
+        })
+      );
+
+      await this.licitationProductRepository.save(licitationProducts);
+
       this.logger.log(
         `Licitation created successfully with ID: ${savedLicitation.id}, call number: ${savedLicitation.callNumber}`,
       );
-      return savedLicitation;
+      
+      // Return with loaded relations
+      return this.findOne(savedLicitation.id);
     } catch (error) {
       this.logger.error(
         `Failed to create licitation with call number: ${createLicitationDto.callNumber}`,
@@ -68,16 +89,55 @@ export class LicitationsService {
     }
   }
 
+  private normalizeProductsInput(
+    products?: ProductWithQuantityDto[],
+    productIds?: number[],
+  ): ProductWithQuantityDto[] {
+    // If products array is provided, use it
+    if (products && products.length > 0) {
+      return products;
+    }
+    
+    // Otherwise, convert legacy productIds to products with quantity 1
+    if (productIds && productIds.length > 0) {
+      return productIds.map(productId => ({ productId, quantity: 1 }));
+    }
+
+    return [];
+  }
+
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    this.logger.debug("Finding all licitations");
-    const [data, total] = await this.licitationRepository.findAndCount({
-      relations: ["client", "products"],
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    this.logger.log(`Found ${data.length} licitations`);
+    const { page = 1, limit = 10, search, status, clientId } = paginationDto;
+    this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}`);
+    
+    const queryBuilder = this.licitationRepository
+      .createQueryBuilder("licitation")
+      .leftJoinAndSelect("licitation.client", "client")
+      .leftJoinAndSelect("licitation.licitationProducts", "licitationProducts")
+      .leftJoinAndSelect("licitationProducts.product", "product")
+      .orderBy("licitation.createdAt", "DESC");
+
+    if (search) {
+      queryBuilder.andWhere(
+        "(licitation.callNumber ILIKE :search OR licitation.internalNumber ILIKE :search OR client.name ILIKE :search)",
+        { search: `%${search}%` }
+      );
+    }
+
+    if (status) {
+      queryBuilder.andWhere("licitation.status = :status", { status });
+    }
+
+    if (clientId) {
+      queryBuilder.andWhere("licitation.clientId = :clientId", { clientId });
+    }
+
+    const [data, total] = await queryBuilder
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    this.logger.log(`Found ${data.length} licitations (total: ${total})`);
     return {
       data,
       meta: {
@@ -93,7 +153,7 @@ export class LicitationsService {
     this.logger.debug(`Finding licitation with ID: ${id}`);
     const licitation = await this.licitationRepository.findOne({
       where: { id },
-      relations: ["client", "products"],
+      relations: ["client", "licitationProducts", "licitationProducts.product"],
     });
     if (!licitation) {
       this.logger.warn(`Licitation with ID ${id} not found`);
@@ -110,7 +170,7 @@ export class LicitationsService {
     this.logger.log(`Updating licitation with ID: ${id}`);
     const licitation = await this.findOne(id);
 
-    const { clientId, productIds, startDate, deadlineDate, ...fieldsToUpdate } =
+    const { clientId, products, productIds, startDate, deadlineDate, ...fieldsToUpdate } =
       updateLicitationDto;
 
     if (startDate || deadlineDate) {
@@ -128,15 +188,39 @@ export class LicitationsService {
       if (deadlineDate) licitation.deadlineDate = deadline;
     }
 
-    await this.updateLicitationRelations(licitation, clientId, productIds);
+    if (clientId !== undefined) {
+      const client = await this.validateClientExists(clientId);
+      licitation.client = client;
+      licitation.clientId = clientId;
+    }
+
+    // Handle products update
+    const productsWithQuantity = this.normalizeProductsInput(products, productIds);
+    if (productsWithQuantity.length > 0) {
+      await this.validateProductsExist(productsWithQuantity.map(p => p.productId));
+      
+      // Remove existing products
+      await this.licitationProductRepository.delete({ licitationId: id });
+      
+      // Add new products
+      const licitationProducts = productsWithQuantity.map(({ productId, quantity }) =>
+        this.licitationProductRepository.create({
+          licitationId: id,
+          productId,
+          quantity: quantity || 1,
+        })
+      );
+      await this.licitationProductRepository.save(licitationProducts);
+    }
+
     this.updateLicitationFields(licitation, fieldsToUpdate);
 
     try {
-      const updatedLicitation = await this.licitationRepository.save(licitation);
+      await this.licitationRepository.save(licitation);
       this.logger.log(
-        `Licitation updated successfully: ID ${id}, call number: ${updatedLicitation.callNumber}`,
+        `Licitation updated successfully: ID ${id}, call number: ${licitation.callNumber}`,
       );
-      return updatedLicitation;
+      return this.findOne(id);
     } catch (error) {
       this.logger.error(
         `Failed to update licitation with ID: ${id}`,
@@ -213,49 +297,10 @@ export class LicitationsService {
     return products;
   }
 
-  private buildLicitationEntity(
-    licitationData: Omit<
-      CreateLicitationDto,
-      "clientId" | "productIds" | "startDate" | "deadlineDate"
-    >,
-    startDate: Date,
-    deadlineDate: Date,
-    client: Client,
-    products: Product[],
-    status?: LicitationStatus,
-  ): Licitation {
-    return this.licitationRepository.create({
-      ...licitationData,
-      startDate,
-      deadlineDate,
-      client,
-      products,
-      status: status || LicitationStatus.PENDING,
-    });
-  }
-
   private updateLicitationFields(
     licitation: Licitation,
     fieldsToUpdate: Partial<UpdateLicitationDto>,
   ): void {
     Object.assign(licitation, fieldsToUpdate);
   }
-
-  private async updateLicitationRelations(
-    licitation: Licitation,
-    clientId?: number,
-    productIds?: number[],
-  ): Promise<void> {
-    if (clientId !== undefined) {
-      const client = await this.validateClientExists(clientId);
-      licitation.client = client;
-      licitation.clientId = clientId;
-    }
-
-    if (productIds !== undefined) {
-      const products = await this.validateProductsExist(productIds);
-      licitation.products = products;
-    }
-  }
 }
-

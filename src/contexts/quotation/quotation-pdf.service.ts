@@ -133,14 +133,13 @@ export class QuotationPdfService {
         
         // Definir columnas con anchos ajustados
         const columns = [
-          { label: 'ITEM', width: 35, align: 'center' as const },
-          { label: 'ARTÍCULO', width: 50, align: 'center' as const },
-          { label: 'CANT.', width: 40, align: 'center' as const },
-          { label: 'DETALLE', width: 100, align: 'center' as const },
-          { label: 'PARTE NUMERO', width: 80, align: 'center' as const },
-          { label: 'Valor Unit. SIN IVA', width: 70, align: 'center' as const },
-          { label: 'Valor Unit. CON IVA', width: 70, align: 'center' as const },
-          { label: 'TOTAL IVA INCLUIDO', width: 70, align: 'center' as const },
+          { label: 'CANT.', width: 30, align: 'center' as const },
+          { label: 'DETALLE / ARTÍCULO', width: 170, align: 'left' as const },
+          { label: 'MARCA', width: 60, align: 'center' as const },
+          { label: 'ORIGEN', width: 50, align: 'center' as const },
+          { label: 'V. UNIT (SIN IVA)', width: 60, align: 'right' as const },
+          { label: 'TOTAL IVA', width: 60, align: 'right' as const },
+          { label: 'TOTAL', width: 65, align: 'right' as const },
         ];
 
         // Calcular posiciones X para cada columna
@@ -180,56 +179,55 @@ export class QuotationPdfService {
 
           doc.fillColor('black');
           
-          // Item número
-          doc.text((index + 1).toString(), columnPositions[0].x + 2, currentY + 8, { 
+          // Cantidad
+          doc.text(item.quantity.toString(), columnPositions[0].x + 2, currentY + 8, { 
             width: columnPositions[0].width - 4, 
             align: 'center' 
           });
           
-          // Artículo (vacío, solo el rectángulo)
-          doc.rect(columnPositions[1].x, currentY, columnPositions[1].width, itemRowHeight).stroke();
-          
-          // Cantidad
-          doc.text(item.quantity.toString(), columnPositions[2].x + 2, currentY + 8, { 
-            width: columnPositions[2].width - 4, 
-            align: 'center' 
-          });
-          
           // Detalle (nombre del producto)
-          doc.text(item.productName, columnPositions[3].x + 3, currentY + 8, { 
-            width: columnPositions[3].width - 6, 
+          doc.text(item.productName, columnPositions[1].x + 3, currentY + 8, { 
+            width: columnPositions[1].width - 6, 
             align: 'left' 
           });
           
-          // Parte Número (ID)
-          doc.text(item.productId?.toString() || '', columnPositions[4].x + 2, currentY + 8, { 
-            width: columnPositions[4].width - 4, 
+          // Marca
+          doc.text(item.brand || '', columnPositions[2].x + 2, currentY + 8, { 
+            width: columnPositions[2].width - 4, 
+            align: 'center' 
+          });
+
+          // Origen
+          doc.text(item.origin || '', columnPositions[3].x + 2, currentY + 8, { 
+            width: columnPositions[3].width - 4, 
             align: 'center' 
           });
           
-          // Valor sin IVA
+          // Valor unitario sin IVA
           doc.text(
-            `${Number(item.priceWithoutIVA).toFixed(2)} ${item.currency}`,
+            `${Number(item.priceWithoutIVA).toFixed(2)}`,
+            columnPositions[4].x + 2,
+            currentY + 8,
+            { width: columnPositions[4].width - 4, align: 'right' }
+          );
+          
+          // Total IVA (monto)
+          const ivaPerUnit = Number(item.priceWithIVA) - Number(item.priceWithoutIVA);
+          const totalIva = ivaPerUnit * item.quantity;
+          doc.text(
+            `${totalIva.toFixed(2)}`,
             columnPositions[5].x + 2,
             currentY + 8,
             { width: columnPositions[5].width - 4, align: 'right' }
           );
           
-          // Valor con IVA
+          // Total linea (con IVA)
+          const total = Number(item.priceWithIVA) * item.quantity;
           doc.text(
-            `${Number(item.priceWithIVA).toFixed(2)} ${item.currency}`,
+            `${total.toFixed(2)}`,
             columnPositions[6].x + 2,
             currentY + 8,
             { width: columnPositions[6].width - 4, align: 'right' }
-          );
-          
-          // Total
-          const total = Number(item.priceWithIVA) * item.quantity;
-          doc.text(
-            `${total.toFixed(2)} ${item.currency}`,
-            columnPositions[7].x + 2,
-            currentY + 8,
-            { width: columnPositions[7].width - 4, align: 'right' }
           );
 
           // Dibujar bordes de todas las celdas
@@ -244,40 +242,77 @@ export class QuotationPdfService {
         const minRows = 5;
         const currentRows = quotation.items.length;
         if (currentRows < minRows) {
-          for (let i = currentRows; i < minRows; i++) {
-            if (i % 2 === 0) {
-              doc.fillColor('#f5f5f5').rect(startX, currentY, currentX - startX, itemRowHeight).fill();
+            for (let i = currentRows; i < minRows; i++) {
+              if (i % 2 === 0) {
+                doc.fillColor('#f5f5f5').rect(startX, currentY, currentX - startX, itemRowHeight).fill();
+              }
+              
+              doc.fillColor('#999999'); // Texto gris suave para filas vacías
+              
+              // Cantidad
+              doc.text('-', columnPositions[0].x + 2, currentY + 8, { 
+                width: columnPositions[0].width - 4, 
+                align: 'center' 
+              });
+              
+              // Detalle
+              doc.text('', columnPositions[1].x + 3, currentY + 8, { 
+                width: columnPositions[1].width - 6, 
+                align: 'left' 
+              });
+              
+              // Ceros en columnas de precio
+              doc.text('0,00', columnPositions[4].x + 2, currentY + 8, { 
+                width: columnPositions[4].width - 4, 
+                align: 'right' 
+              });
+              doc.text('0,00', columnPositions[5].x + 2, currentY + 8, { 
+                width: columnPositions[5].width - 4, 
+                align: 'right' 
+              });
+              doc.text('0,00', columnPositions[6].x + 2, currentY + 8, { 
+                width: columnPositions[6].width - 4, 
+                align: 'right' 
+              });
+
+              columnPositions.forEach(col => {
+                doc.rect(col.x, currentY, col.width, itemRowHeight).stroke();
+              });
+
+              currentY += itemRowHeight;
             }
-            
-            doc.fillColor('black');
-            
-            // x para cantidad
-            doc.text('x', columnPositions[2].x + 2, currentY + 8, { 
-              width: columnPositions[2].width - 4, 
-              align: 'center' 
-            });
-            
-            // Valores en 0
-            doc.text('0,00 USD', columnPositions[5].x + 2, currentY + 8, { 
-              width: columnPositions[5].width - 4, 
-              align: 'right' 
-            });
-            doc.text('0,00 USD', columnPositions[6].x + 2, currentY + 8, { 
-              width: columnPositions[6].width - 4, 
-              align: 'right' 
-            });
-            doc.text('0,00 USD', columnPositions[7].x + 2, currentY + 8, { 
-              width: columnPositions[7].width - 4, 
-              align: 'right' 
-            });
-
-            columnPositions.forEach(col => {
-              doc.rect(col.x, currentY, col.width, itemRowHeight).stroke();
-            });
-
-            currentY += itemRowHeight;
-          }
         }
+
+        // Resumen de Totales
+        const summaryWidth = columnPositions[5].width + columnPositions[6].width;
+        const summaryX = columnPositions[5].x;
+        const summaryRowHeight = 20;
+
+        const subtotal = quotation.items.reduce((acc, item) => acc + (Number(item.priceWithoutIVA) * item.quantity), 0);
+        const total = quotation.items.reduce((acc, item) => acc + (Number(item.priceWithIVA) * item.quantity), 0);
+        const totalIva = total - subtotal;
+
+        currentY += 10;
+        doc.font('Helvetica-Bold').fontSize(8);
+
+        // Subtotal
+        doc.text('SUBTOTAL:', columnPositions[4].x, currentY + 5, { width: columnPositions[4].width, align: 'right' });
+        doc.text(`${subtotal.toFixed(2)}`, columnPositions[6].x, currentY + 5, { width: columnPositions[6].width, align: 'right' });
+        currentY += summaryRowHeight;
+
+        // IVA
+        doc.text('TOTAL IVA:', columnPositions[4].x, currentY + 5, { width: columnPositions[4].width, align: 'right' });
+        doc.text(`${totalIva.toFixed(2)}`, columnPositions[6].x, currentY + 5, { width: columnPositions[6].width, align: 'right' });
+        currentY += summaryRowHeight;
+
+        // Total
+        doc.fillColor('#4472C4').rect(columnPositions[4].x, currentY, columnPositions[6].x + columnPositions[6].width - columnPositions[4].x, summaryRowHeight).fill();
+        doc.fillColor('white');
+        doc.text('TOTAL:', columnPositions[4].x, currentY + 5, { width: columnPositions[4].width, align: 'right' });
+        doc.text(`${total.toFixed(2)} ${quotation.items[0]?.currency || ''}`, columnPositions[6].x, currentY + 5, { width: columnPositions[6].width, align: 'right' });
+        
+        doc.fillColor('black');
+        currentY += summaryRowHeight + 20;
 
         doc.moveDown(1.5);
         currentY = doc.y;

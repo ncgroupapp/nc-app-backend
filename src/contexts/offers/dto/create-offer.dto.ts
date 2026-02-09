@@ -59,6 +59,15 @@ export class CreateOfferDto {
   deliveryDate!: string;
 
   @ApiProperty({
+    description: "Origin",
+    example: "China",
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  origin?: string;
+
+  @ApiProperty({
     description: "Quantity",
     example: 10,
   })

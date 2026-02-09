@@ -5,17 +5,16 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  ManyToMany,
   JoinColumn,
-  JoinTable,
   OneToMany,
 } from "typeorm";
 import { Client } from "@/contexts/clients/entities/client.entity";
-import { Product } from "@/contexts/products/entities/product.entity";
 import { Quotation } from "@/contexts/quotation/entities/quotation.entity";
+import type { LicitationProduct } from "./licitation-product.entity";
 
 export enum LicitationStatus {
   PENDING = "Pending",
+  QUOTED = "Quoted",
   PARTIAL_ADJUDICATION = "Partial Adjudication",
   NOT_ADJUDICATED = "Not Adjudicated",
   TOTAL_ADJUDICATION = "Total Adjudication",
@@ -45,13 +44,11 @@ export class Licitation {
   @Column({ type: "varchar", length: 255 })
   internalNumber!: string;
 
-  @ManyToMany(() => Product, { eager: false })
-  @JoinTable({
-    name: "licitation_products",
-    joinColumn: { name: "licitationId", referencedColumnName: "id" },
-    inverseJoinColumn: { name: "productId", referencedColumnName: "id" },
+  @OneToMany("LicitationProduct", "licitation", {
+    cascade: true,
+    eager: false,
   })
-  products?: Product[];
+  licitationProducts?: LicitationProduct[];
 
   @OneToMany(() => Quotation, (quotation) => quotation.licitation)
   quotations?: Quotation[];
@@ -69,4 +66,3 @@ export class Licitation {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-
