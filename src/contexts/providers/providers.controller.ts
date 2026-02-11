@@ -18,6 +18,7 @@ import {
   ApiOperation,
   ApiResponse,
   ApiQuery,
+  ApiBody,
 } from "@nestjs/swagger";
 import { ProvidersService } from "./providers.service";
 import { CreateProviderDto } from "./dto/create-provider.dto";
@@ -100,6 +101,39 @@ export class ProvidersController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update a provider" })
+  @ApiBody({
+    type: UpdateProviderDto,
+    examples: {
+      basicUpdate: {
+        summary: "Basic update (Name and Country)",
+        value: {
+          name: "Updated Provider Name",
+          country: "Argentina",
+        },
+      },
+      brandUpdate: {
+        summary: "Update Brand (Use brand_id)",
+        description: "Note: Use 'brand_id' to update the associated brand, not 'brandId'.",
+        value: {
+          brand_id: 5,
+        },
+      },
+      contactsUpdate: {
+        summary: "Update Contacts (Full replacement)",
+        description: "When updating contacts, the entire list must be sent. Single contact updates are not supported.",
+        value: {
+          contacts: [
+            {
+              name: "New Contact Name",
+              email: "new.contact@example.com",
+              phone: "+598 99 123 456",
+              address: "New Address 1234",
+            },
+          ],
+        },
+      },
+    },
+  })
   @ApiResponse({
     status: 200,
     description: "Provider updated successfully",
