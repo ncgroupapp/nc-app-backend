@@ -173,4 +173,22 @@ export class AdjudicationsController {
   remove(@Param('id') id: string): Promise<void> {
     return this.adjudicationsService.remove(+id);
   }
+
+  @Patch('quotation-item/:itemId/quantity')
+  @ApiOperation({ summary: 'Actualizar cantidad adjudicada de un item' })
+  @ApiParam({ name: 'itemId', description: 'ID del item de cotización' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cantidad adjudicada actualizada exitosamente. También actualiza el item de entrega.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Item de cotización no encontrado',
+  })
+  updateAwardedQuantity(
+    @Param('itemId') itemId: string,
+    @Body('quantity') quantity: number,
+  ) {
+    return this.adjudicationsService.updateAwardedQuantity(+itemId, quantity);
+  }
 }

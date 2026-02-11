@@ -4,9 +4,15 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AdjudicationStatus } from '../entities/adjudication.entity';
 
 export class CreateAdjudicationItemDto {
-  @ApiProperty({ description: 'ID del producto' })
+  @ApiPropertyOptional({ description: 'ID del producto' })
+  @IsOptional()
   @IsNumber()
-  productId!: number;
+  productId?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre del producto' })
+  @IsOptional()
+  @IsString()
+  productName?: string;
 
   @ApiProperty({ description: 'Cantidad adjudicada' })
   @IsNumber()
@@ -20,9 +26,10 @@ export class CreateAdjudicationItemDto {
 }
 
 export class NonAwardedItemDto {
-  @ApiProperty({ description: 'ID del producto' })
+  @ApiPropertyOptional({ description: 'ID del producto' })
+  @IsOptional()
   @IsNumber()
-  productId!: number;
+  productId?: number;
 
   @ApiProperty({ description: 'Nombre de la empresa ganadora' })
   @IsString()

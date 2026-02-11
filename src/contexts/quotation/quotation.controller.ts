@@ -260,6 +260,6 @@ export class QuotationController {
     reply.header("Content-Type", "application/pdf");
     reply.header("Content-Disposition", `attachment; filename="${filename}"`);
     
-    return new StreamableFile(pdfBuffer);
+    reply.send(pdfBuffer);
   }
 }

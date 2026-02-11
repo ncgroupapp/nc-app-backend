@@ -110,7 +110,11 @@ export class QuotationItem {
   @Column({ type: 'varchar', length: 255 })
   productName!: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  brand?: string;
 
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  origin?: string;
 
   @Column({ type: 'int', nullable: true })
   providerId?: number;

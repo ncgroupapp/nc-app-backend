@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
-import { Quotation, QuotationItem, QuotationStatus } from './entities/quotation.entity';
+import { Quotation, QuotationItem, QuotationStatus, QuotationAwardStatus } from './entities/quotation.entity';
 import { AdjudicationsService } from '@/contexts/adjudications/adjudications.service';
 import { AdjudicationStatus } from '@/contexts/adjudications/entities/adjudication.entity';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { Product } from '@/contexts/products/entities/product.entity';
+import { Licitation, LicitationStatus } from '@/contexts/licitations/entities/licitation.entity';
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
@@ -20,6 +21,8 @@ export class QuotationService {
     private readonly quotationItemRepository: Repository<QuotationItem>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Licitation)
+    private readonly licitationRepository: Repository<Licitation>,
     private readonly adjudicationsService: AdjudicationsService,
   ) {}
 
@@ -53,13 +56,21 @@ export class QuotationService {
       paymentForm: createQuotationDto.paymentForm,
       validity: createQuotationDto.validity,
       items: await Promise.all(createQuotationDto.items.map(async (item) => {
-        const product = await this.productRepository.findOne({ where: { id: item.productId } });
-        if (!product) {
-          throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(item.productId));
+        // Usar productName del DTO directamente, o buscarlo por productId como fallback
+        let productName = item.productName;
+        if (!productName && item.productId) {
+          const product = await this.productRepository.findOne({ where: { id: item.productId } });
+          if (!product) {
+            throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(item.productId));
+          }
+          productName = product.name;
+        }
+        if (!productName) {
+          throw new NotFoundException('Se requiere productName o un productId válido');
         }
         return this.quotationItemRepository.create({
           ...item,
-          productName: product.name,
+          productName,
         });
       })),
     });
@@ -142,21 +153,52 @@ export class QuotationService {
 
       // Crear nuevos items
       quotation.items = await Promise.all(updateQuotationDto.items.map(async (item) => {
-        const product = await this.productRepository.findOne({ where: { id: item.productId } });
-        if (!product) {
-          throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(item.productId));
+        // Usar productName, brand, origin del DTO si existen, o buscarlos por productId
+        let productName = item.productName;
+        let brand = item.brand;
+        let origin = item.origin;
+
+        if ((!productName || !brand || !origin) && item.productId) {
+          const product = await this.productRepository.findOne({ where: { id: item.productId } });
+          if (product) {
+            if (!productName) productName = product.name;
+            if (!brand) brand = product.brand;
+            if (!origin) origin = product.origin;
+          } else if (!productName) {
+            throw new NotFoundException(ERROR_MESSAGES.PRODUCTS.NOT_FOUND(item.productId));
+          }
         }
+
+        if (!productName) {
+          throw new NotFoundException('Se requiere productName o un productId válido');
+        }
+
+        // Recalcular awardStatus si el item tiene awardedQuantity
+        let awardStatus = item.awardStatus;
+        if (item.awardedQuantity !== undefined && item.awardedQuantity > 0) {
+          if (item.awardedQuantity >= item.quantity) {
+            awardStatus = QuotationAwardStatus.AWARDED;
+          } else {
+            awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
+          }
+        }
+        console.log('Recalculated awardStatus:', awardStatus);
+
         return this.quotationItemRepository.create({ 
           ...item, 
           quotationId: id,
-          productName: product.name,
+          productName,
+          brand,
+          origin,
+          awardStatus,
         });
       }));
     }
 
-    // Actualizar campos de la cotización
+    // Actualizar campos de la cotización (excluyendo items ya que fueron procesados arriba)
+    const { items: _items, ...quotationFieldsToUpdate } = updateQuotationDto;
     Object.assign(quotation, {
-      ...updateQuotationDto,
+      ...quotationFieldsToUpdate,
       quotationDate: updateQuotationDto.quotationDate
         ? new Date(updateQuotationDto.quotationDate)
         : quotation.quotationDate,
@@ -166,6 +208,15 @@ export class QuotationService {
     });
 
     const savedQuotation = await this.quotationRepository.save(quotation);
+
+    // Si la cotización se finaliza, actualizar el estado de la licitación a QUOTED
+    if (savedQuotation.status === QuotationStatus.FINALIZED && savedQuotation.licitationId) {
+      const licitation = await this.licitationRepository.findOne({ where: { id: savedQuotation.licitationId } });
+      if (licitation && licitation.status === LicitationStatus.PENDING) {
+        licitation.status = LicitationStatus.QUOTED;
+        await this.licitationRepository.save(licitation);
+      }
+    }
 
     // Check if status changed to FINALIZED and trigger adjudication if needed
     // Note: This logic assumes that "Finalized" means we are ready to adjudicate.

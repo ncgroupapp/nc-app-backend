@@ -24,6 +24,9 @@ export class Offer {
   @Column({ type: "date" })
   deliveryDate!: Date;
 
+  @Column({ type: "varchar", length: 100, nullable: true })
+  origin?: string;
+
   @Column({ type: "int" })
   quantity!: number;
 
