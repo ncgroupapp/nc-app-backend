@@ -7,7 +7,6 @@ import {
   ManyToOne,
   JoinColumn,
 } from "typeorm";
-import { Brand } from "../../brands/entities/brand.entity";
 
 export class Contact {
   name!: string;
@@ -30,12 +29,8 @@ export class Provider {
   @Column({ type: "varchar", length: 100 })
   country!: string;
 
-  @Column({ type: "int", nullable: true })
-  brandId?: number;
-
-  @ManyToOne(() => Brand, { eager: false, nullable: true })
-  @JoinColumn({ name: "brandId" })
-  brand?: Brand;
+  @Column({ type: "varchar", length: 100, nullable: true })
+  brand?: string;
 
   @Column({ type: "jsonb" })
   contacts!: Contact[];

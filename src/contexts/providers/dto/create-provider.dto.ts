@@ -69,13 +69,13 @@ export class CreateProviderDto {
   country!: string;
 
   @ApiProperty({
-    description: "Provider brand ID",
-    example: 1,
+    description: "Provider brand name",
+    example: "Fiat",
     required: false,
   })
-  @IsNumber()
+  @IsString()
   @IsOptional()
-  brand_id?: number;
+  brand?: string;
 
   @ApiProperty({
     description: "Provider contacts",

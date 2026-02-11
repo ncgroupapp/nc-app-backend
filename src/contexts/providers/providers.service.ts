@@ -34,13 +34,8 @@ export class ProvidersService {
     await this.validateRutNotExists(normalizedRut);
 
     try {
-      // Map brand_id to brandId (TypeORM column)
-      const { brand_id, ...rest } = createProviderDto;
-      const providerData: any = { ...rest, rut: normalizedRut };
-      if (brand_id) {
-        providerData.brandId = brand_id;
-      }
-
+      const providerData: any = { ...createProviderDto, rut: normalizedRut };
+      
       const provider: Provider = this.providerRepository.create(providerData as Provider);
       const savedProvider = await this.providerRepository.save(provider);
       this.logger.log(
@@ -61,20 +56,19 @@ export class ProvidersService {
     this.logger.debug(`Finding providers with page: ${page}, limit: ${limit}${search ? `, search: ${search}` : ''}${filters?.brand ? `, brand: ${filters.brand}` : ''}`);
 
     const queryBuilder = this.providerRepository.createQueryBuilder('provider')
-      .leftJoinAndSelect('provider.brand', 'brand')
       .orderBy('provider.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
     if (search) {
       queryBuilder.where(
-        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search OR brand.name ILIKE :search)',
+        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search OR provider.brand ILIKE :search)',
         { search: `%${search}%` }
       );
     }
 
     if (filters?.brand) {
-      queryBuilder.andWhere('brand.name ILIKE :brand', { brand: `%${filters.brand}%` });
+      queryBuilder.andWhere('provider.brand ILIKE :brand', { brand: `%${filters.brand}%` });
     }
 
     const [data, total] = await queryBuilder.getManyAndCount();
@@ -95,8 +89,8 @@ export class ProvidersService {
     this.logger.debug(`Finding provider with ID: ${id}`);
     const provider = await this.providerRepository.findOne({ 
       where: { id },
-      relations: ['brand']
     });
+
     if (!provider) {
       this.logger.warn(`Provider with ID ${id} not found`);
       throw new NotFoundException(ERROR_MESSAGES.PROVIDERS.NOT_FOUND(id));
@@ -125,12 +119,8 @@ export class ProvidersService {
     }
 
     try {
-      const { brand_id, ...rest } = updateProviderDto;
-      const updateData: any = { ...rest };
-      if (brand_id !== undefined) {
-        updateData.brandId = brand_id;
-      }
-      
+      const { brand, ...rest } = updateProviderDto;
+      const updateData: any = { ...updateProviderDto };
       Object.assign(provider, updateData);
       const updatedProvider = await this.providerRepository.save(provider);
       this.logger.log(
