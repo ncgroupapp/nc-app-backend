@@ -16,7 +16,7 @@ import { AppModule } from "@/app/app.module";
 import { TransformInterceptor } from "@/contexts/shared/interceptors/transform.interceptor";
 import { AllExceptionsFilter } from "@/contexts/shared/filters/all-exceptions.filter";
 
-async function bootstrap() {
+export async function createApp() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter(),
@@ -35,6 +35,8 @@ async function bootstrap() {
         "http://localhost:4201",
         "http://localhost:8100",
         "http://127.0.0.1:55376",
+        "https://nc-app.vercel.app", // Added production URL just in case
+        "https://nc-app-backend.vercel.app"
       ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Authorization", "Content-Type"],
@@ -53,11 +55,7 @@ async function bootstrap() {
   );
 
   app.useGlobalInterceptors(new TransformInterceptor());
-  const httpAdapter = app.getHttpAdapter();
   app.useGlobalFilters(new AllExceptionsFilter());
-
-  const configService = app.get(ConfigService);
-  const port = configService.get<string>("PORT", "3000");
 
   const config = new DocumentBuilder()
     .setTitle("Corna App")
@@ -68,13 +66,24 @@ async function bootstrap() {
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api", app, documentFactory);
+
+  return app;
+}
+
+async function bootstrap() {
+  const app = await createApp();
+  const configService = app.get(ConfigService);
+  const port = configService.get<string>("PORT", "3000");
+
   await app.listen(port, "0.0.0.0");
 
   const logger = app.get(Logger);
   logger.log(`App is ready and listening on port ${port} 🚀`);
 }
 
-bootstrap().catch(handleError);
+if (require.main === module) {
+  bootstrap().catch(handleError);
+}
 
 function handleError(error: unknown) {
   // eslint-disable-next-line no-console
