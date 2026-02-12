@@ -38,6 +38,7 @@ export async function createApp() {
         "https://nc-app.vercel.app", // Added production URL just in case
         "https://nc-app-backend.vercel.app",
         "https://nc-ixbgw9ipk-ncgroups-projects.vercel.app",
+        "https://nc-app-kappa.vercel.app",
       ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Authorization", "Content-Type"],
