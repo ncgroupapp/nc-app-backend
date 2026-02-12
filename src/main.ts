@@ -24,6 +24,14 @@ export async function createApp() {
 
   await app.register(multipart);
 
+  const configService = app.get(ConfigService);
+
+  const front_url = configService.get<string>(
+    "FRONT_URL",
+    "https://nc-app-kappa.vercel.app",
+  );
+
+
   // Configuración CORS
   await app
     .getHttpAdapter()
@@ -35,9 +43,7 @@ export async function createApp() {
         "http://localhost:4201",
         "http://localhost:8100",
         "http://127.0.0.1:55376",
-        "https://nc-app.vercel.app", // Added production URL just in case
-        "https://nc-app-backend.vercel.app",
-        "https://nc-app-kappa.vercel.app",
+        front_url
       ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Authorization", "Content-Type"],
