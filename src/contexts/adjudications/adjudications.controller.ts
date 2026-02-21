@@ -40,6 +40,11 @@ export class AdjudicationsController {
     description: 'Filtrar por estado (total/parcial)',
   })
   @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Búsqueda general (por ej. ID)',
+  })
+  @ApiQuery({
     name: 'quotationId',
     required: false,
     description: 'Filtrar por ID de cotización',
@@ -55,20 +60,18 @@ export class AdjudicationsController {
   })
   findAll(
     @Query() paginationDto: PaginationDto,
+    @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('quotationId') quotationId?: string,
     @Query('licitationId') licitationId?: string,
   ) {
-    if (status) {
-      return this.adjudicationsService.findByStatus(status as any);
-    }
-    if (quotationId) {
-      return this.adjudicationsService.findByQuotation(+quotationId);
-    }
-    if (licitationId) {
-      return this.adjudicationsService.findByLicitation(+licitationId);
-    }
-    return this.adjudicationsService.findAll(paginationDto);
+    return this.adjudicationsService.findAll(
+      paginationDto,
+      search,
+      status,
+      quotationId ? +quotationId : undefined,
+      licitationId ? +licitationId : undefined
+    );
   }
 
   @Get('by-client/:clientId')

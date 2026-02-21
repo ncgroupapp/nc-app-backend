@@ -59,6 +59,11 @@ export class QuotationController {
     description: "Filtrar por estado (creada/finalizada)",
   })
   @ApiQuery({
+    name: "search",
+    required: false,
+    description: "Búsqueda por identificador o nombre de cliente",
+  })
+  @ApiQuery({
     name: "clientId",
     required: false,
     description: "Filtrar por ID de cliente",
@@ -69,16 +74,11 @@ export class QuotationController {
   })
   findAll(
     @Query() paginationDto: PaginationDto,
+    @Query("search") search?: string,
     @Query("status") status?: string,
     @Query("clientId") clientId?: string,
   ) {
-    if (status) {
-      return this.quotationService.findByStatus(status);
-    }
-    if (clientId) {
-      return this.quotationService.findByClient(+clientId);
-    }
-    return this.quotationService.findAll(paginationDto);
+    return this.quotationService.findAll(paginationDto, search, status, clientId ? +clientId : undefined);
   }
 
   @Get("by-client/:clientId")

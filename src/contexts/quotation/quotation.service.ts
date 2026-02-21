@@ -78,14 +78,31 @@ export class QuotationService {
     return await this.quotationRepository.save(quotation);
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Quotation>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number): Promise<PaginatedResult<Quotation>> {
     const { page = 1, limit = 10 } = paginationDto;
-    const [data, total] = await this.quotationRepository.findAndCount({
-      relations: ['items'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    
+    const queryBuilder = this.quotationRepository.createQueryBuilder('quotation')
+      .leftJoinAndSelect('quotation.items', 'items')
+      .orderBy('quotation.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search) {
+      queryBuilder.andWhere(
+        '(quotation.quotationIdentifier ILIKE :search OR quotation.clientName ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (status) {
+      queryBuilder.andWhere('quotation.status = :status', { status });
+    }
+
+    if (clientId) {
+      queryBuilder.andWhere('quotation.clientId = :clientId', { clientId });
+    }
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     return {
       data,

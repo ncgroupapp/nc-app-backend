@@ -319,14 +319,36 @@ export class AdjudicationsService {
     await this.licitationRepository.save(licitation);
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Adjudication>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number): Promise<PaginatedResult<Adjudication>> {
     const { page = 1, limit = 10 } = paginationDto;
-    const [data, total] = await this.adjudicationRepository.findAndCount({
-      relations: ['items'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    
+    const queryBuilder = this.adjudicationRepository.createQueryBuilder('adjudication')
+      .leftJoinAndSelect('adjudication.items', 'items')
+      .orderBy('adjudication.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search) {
+      // Cast the numeric ID to text to search along with potential string references
+      queryBuilder.andWhere(
+        '(adjudication.id::text ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (status) {
+      queryBuilder.andWhere('adjudication.status = :status', { status });
+    }
+
+    if (quotationId) {
+      queryBuilder.andWhere('adjudication.quotationId = :quotationId', { quotationId });
+    }
+
+    if (licitationId) {
+      queryBuilder.andWhere('adjudication.licitationId = :licitationId', { licitationId });
+    }
+
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     return {
       data,
