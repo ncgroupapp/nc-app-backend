@@ -38,7 +38,10 @@
     "lint:file": "eslint --ignore-path .gitignore",
     "lint:yaml": "chmod +x scripts/lint_yaml.sh && ./scripts/lint_yaml.sh",
     "build:clean": "rimraf dist; exit 0",
-    "typos": "chmod +x scripts/check_typos.sh && ./scripts/check_typos.sh"
+    "typos": "chmod +x scripts/check_typos.sh && ./scripts/check_typos.sh",
+    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
+    "m:gen": "npm run typeorm -- migration:generate -d src/config/typeorm.ts src/migrations/UpdateDB",
+    "m:run": "npm run typeorm -- migration:run -d src/config/typeorm.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
