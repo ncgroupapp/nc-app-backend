@@ -41,7 +41,8 @@
     "typos": "chmod +x scripts/check_typos.sh && ./scripts/check_typos.sh",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "m:gen": "npm run typeorm -- migration:generate -d src/config/typeorm.ts src/migrations/UpdateDB",
-    "m:run": "npm run typeorm -- migration:run -d src/config/typeorm.ts"
+    "m:run": "npm run typeorm -- migration:run -d src/config/typeorm.ts",
+    "m:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/config/typeorm.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
