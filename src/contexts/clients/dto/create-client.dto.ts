@@ -7,6 +7,7 @@ import {
   IsEmail,
   IsOptional,
   ArrayMinSize,
+  ValidateIf,
 } from "class-validator";
 import { Type } from "class-transformer";
 
@@ -17,9 +18,10 @@ export class ContactDto {
   name!: string;
 
   @ApiProperty({ description: "Contact email", example: "juan@example.com" })
+  @ValidateIf((o) => o.email !== "" && o.email !== null && o.email !== undefined)
   @IsEmail()
-  @IsNotEmpty()
-  email!: string;
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({
     description: "Contact phone",

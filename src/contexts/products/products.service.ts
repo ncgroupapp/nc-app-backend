@@ -5,7 +5,6 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
 import { Provider } from '../providers/entities/provider.entity';
-import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
@@ -53,8 +52,8 @@ export class ProductsService {
   }
 
 
-  async findAll(filters?: FilterProductsDto, paginationDto?: PaginationDto): Promise<PaginatedResult<Product>> {
-    const { page = 1, limit = 10 } = paginationDto || {};
+  async findAll(filters?: FilterProductsDto): Promise<PaginatedResult<Product>> {
+    const { page = 1, limit = 10 } = filters || {};
 
     this.logger.debug(`Finding products with filters: ${JSON.stringify(filters || {})}`);
     
