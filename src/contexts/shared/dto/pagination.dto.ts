@@ -26,4 +26,8 @@ export class PaginationDto {
   @Type(() => Number)
   @IsPositive()
   clientId?: number;
+
+  @IsOptional()
+  @IsString()
+  clientIds?: string;
 }

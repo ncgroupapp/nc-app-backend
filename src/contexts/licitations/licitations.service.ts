@@ -107,8 +107,8 @@ export class LicitationsService {
   }
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
-    const { page = 1, limit = 10, search, status, clientId } = paginationDto;
-    this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}`);
+    const { page = 1, limit = 10, search, status, clientId, clientIds } = paginationDto;
+    this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}, clientIds=${clientIds}`);
     
     const queryBuilder = this.licitationRepository
       .createQueryBuilder("licitation")
@@ -130,6 +130,13 @@ export class LicitationsService {
 
     if (clientId) {
       queryBuilder.andWhere("licitation.clientId = :clientId", { clientId });
+    }
+
+    if (clientIds) {
+      const ids = clientIds.split(',').map(Number).filter(n => !isNaN(n));
+      if (ids.length > 0) {
+        queryBuilder.andWhere("licitation.clientId IN (:...clientIds)", { clientIds: ids });
+      }
     }
 
     const [data, total] = await queryBuilder
