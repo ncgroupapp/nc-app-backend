@@ -198,10 +198,16 @@ export class AdjudicationsService {
             ...newItem,
             adjudicationId: existingAdjudication.id,
           });
-          await this.adjudicationItemRepository.save(itemToSave);
+          const savedNewItem = await this.adjudicationItemRepository.save(itemToSave);
+          if (existingAdjudication.items) {
+            existingAdjudication.items.push(savedNewItem);
+          } else {
+            existingAdjudication.items = [savedNewItem];
+          }
         }
       }
 
+      existingAdjudication.status = createAdjudicationDto.status;
       savedAdjudication = await this.adjudicationRepository.save(existingAdjudication);
       
       // Reload adjudication with updated items for delivery processing
