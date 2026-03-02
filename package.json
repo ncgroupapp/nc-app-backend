@@ -38,7 +38,11 @@
     "lint:file": "eslint --ignore-path .gitignore",
     "lint:yaml": "chmod +x scripts/lint_yaml.sh && ./scripts/lint_yaml.sh",
     "build:clean": "rimraf dist; exit 0",
-    "typos": "chmod +x scripts/check_typos.sh && ./scripts/check_typos.sh"
+    "typos": "chmod +x scripts/check_typos.sh && ./scripts/check_typos.sh",
+    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
+    "m:gen": "npm run typeorm -- migration:generate -d src/config/typeorm.ts src/migrations/UpdateDB",
+    "m:run": "npm run typeorm -- migration:run -d src/config/typeorm.ts",
+    "m:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/config/typeorm.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
@@ -58,6 +62,7 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "fastify": "^4.28.1",
     "jsonwebtoken": "^9.0.3",
@@ -111,7 +116,7 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "unplugin-swc": "^1.5.5",
     "vite": "^5.4.21",
     "vitest": "^1.6.1",

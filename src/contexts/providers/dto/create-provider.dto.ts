@@ -8,6 +8,7 @@ import {
   IsOptional,
   ArrayMinSize,
   IsNumber,
+  ValidateIf,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { IsUruguayRut } from "@/contexts/shared/validators/is-uruguay-rut.validator";
@@ -19,9 +20,10 @@ export class ContactDto {
   name!: string;
 
   @ApiProperty({ description: "Contact email", example: "juan@example.com" })
+    @ValidateIf((o) => o.email !== "" && o.email !== null && o.email !== undefined)
   @IsEmail()
-  @IsNotEmpty()
-  email!: string;
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({
     description: "Contact phone",
@@ -48,9 +50,8 @@ export class CreateProviderDto {
     example: "12345678-6",
   })
   @IsString()
-  @IsNotEmpty()
-  // @IsUruguayRut({ message: "RUT must be a valid Uruguayan RUT format (12 digits) with valid check digit" })
-  rut!: string;
+  @IsOptional()
+  rut?: string;
 
   @ApiProperty({
     description: "Provider name",
@@ -69,13 +70,23 @@ export class CreateProviderDto {
   country!: string;
 
   @ApiProperty({
-    description: "Provider brand name",
-    example: "Fiat",
+    description: "Provider website",
+    example: "https://www.example.com",
     required: false,
   })
   @IsString()
   @IsOptional()
-  brand?: string;
+  website?: string;
+
+  @ApiProperty({
+    description: "Provider brand names",
+    example: ["Fiat", "Chevrolet"],
+    required: false,
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  brands?: string[];
 
   @ApiProperty({
     description: "Provider contacts",

@@ -14,8 +14,8 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true })
   origin?: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  image?: string;
+  @Column('text', { array: true, nullable: true })
+  images?: string[];
 
   @ManyToMany(() => Provider, { eager: false })
   @JoinTable({

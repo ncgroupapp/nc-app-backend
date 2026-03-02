@@ -27,16 +27,16 @@ export class ProvidersService {
   ) {}
 
   async create(createProviderDto: CreateProviderDto): Promise<Provider> {
-    this.logger.log(`Creating provider with RUT: ${createProviderDto.rut}`);
+    this.logger.log(`Creating provider: ${createProviderDto.name}`);
 
-    const normalizedRut = this.normalizeRut(createProviderDto.rut);
-    // this.validateRutChecksum(normalizedRut);
-    await this.validateRutNotExists(normalizedRut);
+    if (createProviderDto.rut) {
+      const normalizedRut = this.normalizeRut(createProviderDto.rut);
+      // await this.validateRutNotExists(normalizedRut);
+      createProviderDto.rut = normalizedRut;
+    }
 
     try {
-      const providerData: any = { ...createProviderDto, rut: normalizedRut };
-      
-      const provider: Provider = this.providerRepository.create(providerData as Provider);
+      const provider: Provider = this.providerRepository.create(createProviderDto as Provider);
       const savedProvider = await this.providerRepository.save(provider);
       this.logger.log(
         `Provider created successfully with ID: ${savedProvider.id}, RUT: ${savedProvider.rut}`,
@@ -44,7 +44,7 @@ export class ProvidersService {
       return savedProvider;
     } catch (error) {
       this.logger.error(
-        `Failed to create provider with RUT: ${createProviderDto.rut}`,
+        `Failed to create provider: ${createProviderDto.name}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw error;
@@ -62,13 +62,13 @@ export class ProvidersService {
 
     if (search) {
       queryBuilder.where(
-        '(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search OR provider.brand ILIKE :search)',
+        "(provider.name ILIKE :search OR provider.rut ILIKE :search OR provider.country ILIKE :search OR array_to_string(provider.brands, ',') ILIKE :search)",
         { search: `%${search}%` }
       );
     }
 
     if (filters?.brand) {
-      queryBuilder.andWhere('provider.brand ILIKE :brand', { brand: `%${filters.brand}%` });
+      queryBuilder.andWhere("array_to_string(provider.brands, ',') ILIKE :brand", { brand: `%${filters.brand}%` });
     }
 
     const [data, total] = await queryBuilder.getManyAndCount();
@@ -114,12 +114,11 @@ export class ProvidersService {
     if (updateProviderDto.rut && updateProviderDto.rut !== provider.rut) {
       const normalizedRut = this.normalizeRut(updateProviderDto.rut);
       // this.validateRutChecksum(normalizedRut);
-      await this.validateRutNotExists(normalizedRut);
+      // await this.validateRutNotExists(normalizedRut);
       updateProviderDto.rut = normalizedRut;
     }
 
     try {
-      const { brand, ...rest } = updateProviderDto;
       const updateData: any = { ...updateProviderDto };
       Object.assign(provider, updateData);
       const updatedProvider = await this.providerRepository.save(provider);

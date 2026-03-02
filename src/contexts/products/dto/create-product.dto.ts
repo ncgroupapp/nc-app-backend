@@ -9,11 +9,12 @@ export class CreateProductDto {
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ description: 'Product image URL', example: 'https://example.com/image.jpg', required: false })
-  @IsString()
+  @ApiProperty({ description: 'Product images URLs', example: ['https://example.com/image1.jpg', 'https://example.com/image2.jpg'], required: false })
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  @IsUrl()
-  image?: string;
+  @IsUrl({}, { each: true })
+  images?: string[];
 
   @ApiProperty({ description: 'Provider IDs', example: [1, 2, 3], required: false })
   @IsArray()
