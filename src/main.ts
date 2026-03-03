@@ -10,6 +10,7 @@ import {
 } from "@nestjs/platform-fastify";
 import fastifyCors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import helmet from "@fastify/helmet";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "@/app/app.module";
@@ -22,7 +23,17 @@ export async function createApp() {
     new FastifyAdapter(),
   );
 
-  await app.register(multipart);
+  await app.register(multipart as any);
+  await app.register(helmet as any, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: [`'self'`],
+        styleSrc: [`'self'`, `'unsafe-inline'`],
+        imgSrc: [`'self'`, 'data:', 'validator.swagger.io'],
+        scriptSrc: [`'self'`, `https: 'unsafe-inline'`],
+      },
+    },
+  });
 
   const configService = app.get(ConfigService);
 
@@ -36,7 +47,7 @@ export async function createApp() {
   await app
     .getHttpAdapter()
     .getInstance()
-    .register(fastifyCors, {
+    .register(fastifyCors as any, {
       origin: [
         "http://localhost:3001",
         "http://localhost:4200",
