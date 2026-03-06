@@ -88,7 +88,7 @@ export class OffersService {
 
     if (search) {
       query.andWhere(
-        "(offer.name ILIKE :search OR product.name ILIKE :search OR provider.name ILIKE :search)",
+        "(offer.name ILIKE :search OR product.name ILIKE :search OR provider.name ILIKE :search OR product.code ILIKE :search)",
         { search: `%${search}%` },
       );
     }
