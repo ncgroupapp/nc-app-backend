@@ -13,7 +13,7 @@ export class ManualsService {
   constructor(
     @InjectRepository(Manual)
     private readonly manualRepository: Repository<Manual>,
-  ) {}
+  ) { }
 
   async create(createManualDto: CreateManualDto) {
     const manual = this.manualRepository.create(createManualDto);
@@ -23,7 +23,9 @@ export class ManualsService {
 
   async findAll(paginationDto: PaginationDto, search?: string): Promise<PaginatedResult<Manual>> {
     const { page = 1, limit = 10 } = paginationDto;
-    const where = search ? { name: ILike(`%${search}%`) } : {};
+    const where = search
+      ? [{ name: ILike(`%${search}%`) }, { description: ILike(`%${search}%`) }]
+      : {};
 
     const [data, total] = await this.manualRepository.findAndCount({
       where,
