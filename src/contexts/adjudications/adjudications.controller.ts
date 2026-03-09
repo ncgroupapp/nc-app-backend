@@ -54,6 +54,11 @@ export class AdjudicationsController {
     required: false,
     description: 'Filtrar por ID de licitación',
   })
+  @ApiQuery({
+    name: 'productId',
+    required: false,
+    description: 'Filtrar por ID de producto',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de adjudicaciones obtenida exitosamente',
@@ -64,13 +69,15 @@ export class AdjudicationsController {
     @Query('status') status?: string,
     @Query('quotationId') quotationId?: string,
     @Query('licitationId') licitationId?: string,
+    @Query('productId') productId?: string,
   ) {
     return this.adjudicationsService.findAll(
       paginationDto,
       search,
       status,
       quotationId ? +quotationId : undefined,
-      licitationId ? +licitationId : undefined
+      licitationId ? +licitationId : undefined,
+      productId ? +productId : undefined
     );
   }
 
@@ -88,11 +95,29 @@ export class AdjudicationsController {
   @Get('by-product/:productId')
   @ApiOperation({ summary: 'Obtener adjudicaciones por producto' })
   @ApiParam({ name: 'productId', description: 'ID del producto' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filtrar por estado',
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Búsqueda general',
+  })
   @ApiResponse({
     status: 200,
     description: 'Adjudicaciones encontradas',
   })
-  findByProduct(@Param('productId') productId: string) {
+  findByProduct(
+    @Param('productId') productId: string,
+    @Query() paginationDto: PaginationDto,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    if (Object.keys(paginationDto).length > 0 && (paginationDto.page || paginationDto.limit)) {
+      return this.adjudicationsService.findAll(paginationDto, search, status, undefined, undefined, +productId);
+    }
     return this.adjudicationsService.findByProduct(+productId);
   }
 

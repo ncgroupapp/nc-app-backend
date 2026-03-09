@@ -78,9 +78,9 @@ export class QuotationService {
     return await this.quotationRepository.save(quotation);
   }
 
-  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number): Promise<PaginatedResult<Quotation>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number, productId?: number): Promise<PaginatedResult<Quotation>> {
     const { page = 1, limit = 10 } = paginationDto;
-    
+
     const queryBuilder = this.quotationRepository.createQueryBuilder('quotation')
       .leftJoinAndSelect('quotation.items', 'items')
       .orderBy('quotation.createdAt', 'DESC')
@@ -89,7 +89,7 @@ export class QuotationService {
 
     if (search) {
       queryBuilder.andWhere(
-        '(quotation.quotationIdentifier ILIKE :search OR quotation.clientName ILIKE :search)',
+        '(quotation.quotationIdentifier ILIKE :search OR quotation.clientName ILIKE :search OR items.providerName ILIKE :search)',
         { search: `%${search}%` }
       );
     }
@@ -102,8 +102,11 @@ export class QuotationService {
       queryBuilder.andWhere('quotation.clientId = :clientId', { clientId });
     }
 
-    const [data, total] = await queryBuilder.getManyAndCount();
+    if (productId) {
+      queryBuilder.andWhere('items.productId = :productId', { productId });
+    }
 
+    const [data, total] = await queryBuilder.getManyAndCount();
     return {
       data,
       meta: {

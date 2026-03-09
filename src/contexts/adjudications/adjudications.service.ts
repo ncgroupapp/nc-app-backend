@@ -325,11 +325,13 @@ export class AdjudicationsService {
     await this.licitationRepository.save(licitation);
   }
 
-  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number): Promise<PaginatedResult<Adjudication>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number, productId?: number): Promise<PaginatedResult<Adjudication>> {
     const { page = 1, limit = 10 } = paginationDto;
-    
+
     const queryBuilder = this.adjudicationRepository.createQueryBuilder('adjudication')
       .leftJoinAndSelect('adjudication.items', 'items')
+      .leftJoinAndSelect('adjudication.licitation', 'licitation')
+      .leftJoinAndSelect('licitation.client', 'client')
       .orderBy('adjudication.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -337,7 +339,7 @@ export class AdjudicationsService {
     if (search) {
       // Cast the numeric ID to text to search along with potential string references
       queryBuilder.andWhere(
-        '(adjudication.id::text ILIKE :search)',
+        '(adjudication.id::text ILIKE :search OR licitation.callNumber ILIKE :search OR licitation.internalNumber ILIKE :search OR client.name ILIKE :search)',
         { search: `%${search}%` }
       );
     }
@@ -354,8 +356,11 @@ export class AdjudicationsService {
       queryBuilder.andWhere('adjudication.licitationId = :licitationId', { licitationId });
     }
 
-    const [data, total] = await queryBuilder.getManyAndCount();
+    if (productId) {
+      queryBuilder.andWhere('items.productId = :productId', { productId });
+    }
 
+    const [data, total] = await queryBuilder.getManyAndCount();
     return {
       data,
       meta: {

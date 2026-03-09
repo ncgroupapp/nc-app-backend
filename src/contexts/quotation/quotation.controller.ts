@@ -77,8 +77,9 @@ export class QuotationController {
     @Query("search") search?: string,
     @Query("status") status?: string,
     @Query("clientId") clientId?: string,
+    @Query("productId") productId?: string,
   ) {
-    return this.quotationService.findAll(paginationDto, search, status, clientId ? +clientId : undefined);
+    return this.quotationService.findAll(paginationDto, search, status, clientId ? +clientId : undefined, productId ? +productId : undefined);
   }
 
   @Get("by-client/:clientId")
@@ -95,11 +96,29 @@ export class QuotationController {
   @Get("by-product/:productId")
   @ApiOperation({ summary: "Obtener cotizaciones por producto" })
   @ApiParam({ name: "productId", description: "ID del producto" })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    description: "Filtrar por estado",
+  })
+  @ApiQuery({
+    name: "search",
+    required: false,
+    description: "Búsqueda por identificador o nombre de cliente/proveedor",
+  })
   @ApiResponse({
     status: 200,
     description: "Cotizaciones encontradas",
   })
-  findByProduct(@Param("productId") productId: string) {
+  findByProduct(
+    @Param("productId") productId: string,
+    @Query() paginationDto: PaginationDto,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+  ) {
+    if (Object.keys(paginationDto).length > 0 && (paginationDto.page || paginationDto.limit)) {
+      return this.quotationService.findAll(paginationDto, search, status, undefined, +productId);
+    }
     return this.quotationService.findByProduct(+productId);
   }
 
