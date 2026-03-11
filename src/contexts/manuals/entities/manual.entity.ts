@@ -15,9 +15,16 @@ export class Manual {
   @Column({ nullable: true })
   description?: string;
 
-  @ApiProperty({ example: 'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fuser-guide.pdf' })
-  @Column()
-  fileUrl!: string;
+  @ApiProperty({
+    example: [
+      'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fuser-guide.pdf',
+      'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fappendix.pdf',
+    ],
+    isArray: true,
+    description: 'List of URLs of the manual files stored in Firebase',
+  })
+  @Column('simple-array')
+  fileUrls!: string[];
 
   @ApiProperty({ example: '2023-12-05T10:00:00Z' })
   @CreateDateColumn()

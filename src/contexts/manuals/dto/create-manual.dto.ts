@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsArray, ArrayMinSize } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateManualDto {
@@ -11,12 +11,18 @@ export class CreateManualDto {
   name!: string;
 
   @ApiProperty({
-    example: 'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fuser-guide.pdf',
-    description: 'The URL of the manual file stored in Firebase',
+    example: [
+      'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fuser-guide.pdf',
+      'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fappendix.pdf',
+    ],
+    description: 'List of URLs of the manual files stored in Firebase',
+    isArray: true,
+    type: String,
   })
-  @IsNotEmpty()
-  @IsString()
-  fileUrl!: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  fileUrls!: string[];
 
   @ApiProperty({
     example: 'This manual describes how to use the system features.',
