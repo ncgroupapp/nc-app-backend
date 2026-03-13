@@ -28,10 +28,10 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true })
   brand?: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true})
   model?: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true, unique: true })
   code?: string;
 
   @Column('text', { array: true, nullable: true })

@@ -17,15 +17,38 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response: any = ctx.getResponse<FastifyReply>(); // Obtén el objeto FastifyReply pero lo declaro como any ya que no reconoce los metodos
 
     // Determina el estado de la excepción
-    const status =
+    let status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    let message =
       exception instanceof HttpException
         ? exception.getResponse()
         : (exception.message ?? "Internal server error");
+
+    // Postgres unique violation error (based on detail message)
+    if (
+      exception?.detail &&
+      typeof exception.detail === "string" &&
+      exception.detail.includes("already exists")
+    ) {
+      const match = exception.detail.match(
+        /Key \((.+)\)=\((.+)\) already exists/,
+      );
+
+      if (match) {
+        status = HttpStatus.CONFLICT;
+        const field = match[1];
+        const value = match[2];
+
+        if (field === "code") {
+          message = `El código '${value}' ya existe`;
+        } else {
+          message = `Ya existe un registro con el valor '${value}' en el campo '${field}'`;
+        }
+      }
+    }
 
     // Log de la excepción
     this.logger.error(

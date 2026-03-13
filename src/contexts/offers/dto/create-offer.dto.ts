@@ -18,7 +18,7 @@ export class CreateOfferDto {
     required: false,
   })
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   name?: string;
 
   @ApiProperty({
@@ -57,6 +57,15 @@ export class CreateOfferDto {
   @IsDateString()
   @IsNotEmpty()
   deliveryDate!: string;
+
+  @ApiProperty({
+    description: "Delivery time in days",
+    example: 5,
+  })
+  @IsNumber()
+  @IsPositive()
+  @Type(() => Number)
+  delivery!: number;
 
   @ApiProperty({
     description: "Origin",

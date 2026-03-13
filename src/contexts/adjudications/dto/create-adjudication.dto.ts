@@ -44,6 +44,11 @@ export class NonAwardedItemDto {
   @IsPositive()
   competitorPrice!: number;
 
+  @ApiPropertyOptional({ description: 'Cantidad del producto' })
+  @IsOptional()
+  @IsNumber()
+  quantity?: number;
+
   @ApiPropertyOptional({ description: 'Marca ofrecida por la competencia' })
   @IsOptional()
   @IsString()

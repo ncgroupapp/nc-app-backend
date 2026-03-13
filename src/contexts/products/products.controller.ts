@@ -44,6 +44,15 @@ export class ProductsController {
     return this.productsService.findOne(id);
   }
 
+  @Get(':id/adjudication-history')
+  @ApiOperation({ summary: 'Get adjudication history (non-awarded items info) for a product' })
+  @ApiResponse({ status: 200, description: 'Adjudication history found' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  async getAdjudicationHistory(@Param('id', ParseIntPipe) id: number): Promise<any[]> {
+    this.logger.debug(`GET /products/${id}/adjudication-history`);
+    return this.productsService.getAdjudicationHistory(id);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Update a product' })
   @ApiResponse({ status: 200, description: 'Product updated successfully', type: Product })

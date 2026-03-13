@@ -217,7 +217,10 @@ export class ProductsService {
     }
   }
 
-
+  async getAdjudicationHistory(id: number): Promise<any[]> {
+    const product = await this.findOne(id);
+    return product.adjudicationHistory || [];
+  }
 
   private async validateProvidersExist(
     providerIds: number[],
