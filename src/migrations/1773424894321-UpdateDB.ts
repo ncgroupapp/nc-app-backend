@@ -23,15 +23,5 @@ export class UpdateDB1773424894321 implements MigrationInterface {
       `ALTER TABLE "products" DROP CONSTRAINT "UQ_7cfc24d6c24f0ec91294003d6b8"`,
     );
     await queryRunner.query(`ALTER TABLE "offers" DROP COLUMN "delivery"`);
-
-    // Revertimos el array a un string simple (tomando el primer link)
-    await queryRunner.query(
-      `ALTER TABLE "manuals" ALTER COLUMN "fileUrls" TYPE character varying USING "fileUrls"[1]`,
-    );
-
-    // Renombramos de vuelta al nombre original
-    await queryRunner.query(
-      `ALTER TABLE "manuals" RENAME COLUMN "fileUrls" TO "fileUrl"`,
-    );
   }
 }
