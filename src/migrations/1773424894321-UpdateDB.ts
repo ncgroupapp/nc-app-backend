@@ -4,6 +4,9 @@ export class UpdateDB1773424894321 implements MigrationInterface {
   name = "UpdateDB1773424894321";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "products" ALTER COLUMN "code" SET NOT NULL`,
+    );
 
     // 3. Aplicamos los cambios seguros en offers y products
     await queryRunner.query(
