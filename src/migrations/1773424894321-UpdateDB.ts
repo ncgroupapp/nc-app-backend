@@ -4,15 +4,6 @@ export class UpdateDB1773424894321 implements MigrationInterface {
   name = "UpdateDB1773424894321";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // 1. Renombramos la columna para que coincida con tu entidad
-    await queryRunner.query(
-      `ALTER TABLE "manuals" RENAME COLUMN "fileUrl" TO "fileUrls"`,
-    );
-
-    // 2. Convertimos el string existente en un array sin perder la información de tus clientes
-    await queryRunner.query(
-      `ALTER TABLE "manuals" ALTER COLUMN "fileUrls" TYPE text[] USING ARRAY["fileUrls"]::text[]`,
-    );
 
     // 3. Aplicamos los cambios seguros en offers y products
     await queryRunner.query(
