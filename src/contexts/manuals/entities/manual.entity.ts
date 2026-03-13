@@ -1,36 +1,39 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
-@Entity('manuals')
+@Entity("manuals")
 export class Manual {
   @ApiProperty({ example: 1 })
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ApiProperty({ example: 'Manual de Usuario' })
+  @ApiProperty({ example: "Manual de Usuario" })
   @Column()
   name!: string;
 
-  @ApiProperty({ example: 'This manual describes how to use the system features.', nullable: true })
+  @ApiProperty({
+    example: "This manual describes how to use the system features.",
+    nullable: true,
+  })
   @Column({ nullable: true })
   description?: string;
 
   @ApiProperty({
     example: [
-      'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fuser-guide.pdf',
-      'https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fappendix.pdf',
+      "https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fuser-guide.pdf",
+      "https://firebasestorage.googleapis.com/v0/b/project.appspot.com/o/manuals%2Fappendix.pdf",
     ],
     isArray: true,
-    description: 'List of URLs of the manual files stored in Firebase',
+    description: "List of URLs of the manual files stored in Firebase",
   })
-  @Column('simple-array')
+  @Column("simple-array")
   fileUrls!: string[];
 
-  @ApiProperty({ example: '2023-12-05T10:00:00Z' })
+  @ApiProperty({ example: "2023-12-05T10:00:00Z" })
   @CreateDateColumn()
   createdAt!: Date;
 
-  @ApiProperty({ example: '2023-12-05T10:00:00Z' })
+  @ApiProperty({ example: "2023-12-05T10:00:00Z" })
   @UpdateDateColumn()
   updatedAt!: Date;
 }
