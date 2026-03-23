@@ -215,6 +215,7 @@ export class OffersService {
     return this.offerRepository.create({
       name: createOfferDto.name,
       price: createOfferDto.price,
+      iva: createOfferDto.iva,
       deliveryDate: new Date(createOfferDto.deliveryDate),
       delivery: createOfferDto.delivery,
       origin: createOfferDto.origin,

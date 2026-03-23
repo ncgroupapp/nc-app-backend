@@ -51,6 +51,17 @@ export class CreateOfferDto {
   price!: number;
 
   @ApiProperty({
+    description: "Offer IVA amount",
+    example: 24000.08,
+    required: false,
+  })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  iva?: number;
+
+  @ApiProperty({
     description: "Delivery date",
     example: "2024-12-31",
   })
