@@ -5,7 +5,7 @@ export class AddIvaToOffers1773424894322 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "offers" ADD "iva" numeric(10,2) NOT NULL DEFAULT '0'`,
+      `ALTER TABLE "offers" ADD COLUMN IF NOT EXISTS "iva" numeric(10,2) NOT NULL DEFAULT '0'`,
     );
   }
 
