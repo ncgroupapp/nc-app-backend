@@ -18,6 +18,7 @@ export enum LicitationStatus {
   PARTIAL_ADJUDICATION = "Partial Adjudication",
   NOT_ADJUDICATED = "Not Adjudicated",
   TOTAL_ADJUDICATION = "Total Adjudication",
+  CLOSED = "Closed",
 }
 
 @Entity("licitations")
@@ -25,10 +26,10 @@ export class Licitation {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Column({ type: "date" })
+  @Column({ type: "timestamp", nullable: true })
   startDate!: Date;
 
-  @Column({ type: "date" })
+  @Column({ type: "timestamp", nullable: true })
   deadlineDate!: Date;
 
   @ManyToOne(() => Client, { nullable: false })
@@ -65,4 +66,7 @@ export class Licitation {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({ type: "timestamp", nullable: true })
+  closedAt?: Date;
 }

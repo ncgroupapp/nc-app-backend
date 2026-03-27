@@ -31,7 +31,7 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true})
   model?: string;
 
-  @Column({ type: 'varchar', length: 100, unique: true })
+  @Column({ type: 'varchar', length: 100, unique: true, nullable: true })
   code?: string;
 
   @Column('text', { array: true, nullable: true })

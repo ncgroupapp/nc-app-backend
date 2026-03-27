@@ -13,6 +13,7 @@ import {
   Query,
   UseInterceptors,
 } from "@nestjs/common";
+import { HttpException } from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
@@ -102,6 +103,20 @@ export class LicitationsController {
   async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
     this.logger.log(`DELETE /licitations/${id} - Deleting licitation`);
     await this.licitationsService.remove(id);
+  }
+
+  @Patch(":id/close")
+  @ApiOperation({ summary: "Close a licitation" })
+  @ApiResponse({
+    status: 200,
+    description: "Licitation closed successfully",
+    type: Licitation,
+  })
+  @ApiResponse({ status: 404, description: "Licitation not found" })
+  @ApiResponse({ status: 400, description: "Licitation already closed" })
+  async close(@Param("id", ParseIntPipe) id: number): Promise<Licitation> {
+    this.logger.log(`PATCH /licitations/${id}/close - Closing licitation`);
+    return this.licitationsService.closeLicitation(id);
   }
 }
 

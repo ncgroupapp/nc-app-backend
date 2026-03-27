@@ -59,6 +59,12 @@ export class AdjudicationsController {
     required: false,
     description: 'Filtrar por ID de producto',
   })
+  @ApiQuery({
+    name: 'closedOnly',
+    required: false,
+    description: 'Mostrar solo adjudicaciones de licitaciones cerradas',
+    type: Boolean,
+  })
   @ApiResponse({
     status: 200,
     description: 'Lista de adjudicaciones obtenida exitosamente',
@@ -77,7 +83,8 @@ export class AdjudicationsController {
       status,
       quotationId ? +quotationId : undefined,
       licitationId ? +licitationId : undefined,
-      productId ? +productId : undefined
+      productId ? +productId : undefined,
+      paginationDto.closedOnly,
     );
   }
 

@@ -1,4 +1,4 @@
-import { IsOptional, IsPositive, Min, IsString } from 'class-validator';
+import { IsBoolean, IsDateString, IsOptional, IsPositive, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PaginationDto {
@@ -30,4 +30,17 @@ export class PaginationDto {
   @IsOptional()
   @IsString()
   clientIds?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dateTo?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  closedOnly?: boolean;
 }

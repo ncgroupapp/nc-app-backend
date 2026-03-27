@@ -78,14 +78,27 @@ export class QuotationService {
     return await this.quotationRepository.save(quotation);
   }
 
-  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number, productId?: number): Promise<PaginatedResult<Quotation>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number, productId?: number, closedOnly?: boolean): Promise<PaginatedResult<Quotation>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const queryBuilder = this.quotationRepository.createQueryBuilder('quotation')
       .leftJoinAndSelect('quotation.items', 'items')
+      .leftJoin('quotation.licitation', 'licitation')
       .orderBy('quotation.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
+
+    // Filter based on closedOnly parameter
+    if (closedOnly === true) {
+      // Only quotations from closed licitations
+      queryBuilder.andWhere('licitation.status = :closedStatus', { closedStatus: LicitationStatus.CLOSED });
+    } else {
+      // By default, exclude quotations from closed licitations
+      queryBuilder.andWhere(
+        '(quotation.licitationId IS NULL OR licitation.status != :closedStatus)',
+        { closedStatus: LicitationStatus.CLOSED }
+      );
+    }
 
     if (search) {
       queryBuilder.andWhere(

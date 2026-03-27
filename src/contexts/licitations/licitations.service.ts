@@ -12,6 +12,7 @@ import { Licitation, LicitationStatus } from "./entities/licitation.entity";
 import { LicitationProduct } from "./entities/licitation-product.entity";
 import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
+import { Quotation, QuotationStatus } from "@/contexts/quotation/entities/quotation.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
@@ -29,6 +30,8 @@ export class LicitationsService {
     private readonly clientRepository: Repository<Client>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    @InjectRepository(Quotation)
+    private readonly quotationRepository: Repository<Quotation>,
   ) {}
 
   async create(
@@ -107,9 +110,9 @@ export class LicitationsService {
   }
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
-    const { page = 1, limit = 10, search, status, clientId, clientIds } = paginationDto;
-    this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}, clientIds=${clientIds}`);
-    
+    const { page = 1, limit = 10, search, status, clientId, clientIds, dateFrom, dateTo } = paginationDto;
+    this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}, clientIds=${clientIds}, dateFrom=${dateFrom}, dateTo=${dateTo}`);
+
     const queryBuilder = this.licitationRepository
       .createQueryBuilder("licitation")
       .leftJoinAndSelect("licitation.client", "client")
@@ -137,6 +140,17 @@ export class LicitationsService {
       if (ids.length > 0) {
         queryBuilder.andWhere("licitation.clientId IN (:...clientIds)", { clientIds: ids });
       }
+    }
+
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      queryBuilder.andWhere("licitation.startDate >= :fromDate", { fromDate });
+    }
+
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      toDate.setHours(23, 59, 59, 999); // Include entire day
+      queryBuilder.andWhere("licitation.startDate <= :toDate", { toDate });
     }
 
     const [data, total] = await queryBuilder
@@ -249,6 +263,49 @@ export class LicitationsService {
     } catch (error) {
       this.logger.error(
         `Failed to delete licitation with ID: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async closeLicitation(id: number): Promise<Licitation> {
+    this.logger.log(`Closing licitation with ID: ${id}`);
+    const licitation = await this.findOne(id);
+
+    if (licitation.status === LicitationStatus.CLOSED) {
+      this.logger.warn(`Licitation with ID ${id} is already closed`);
+      throw new BadRequestException(ERROR_MESSAGES.LICITATIONS.ALREADY_CLOSED);
+    }
+
+    try {
+      // Update licitation status to CLOSED
+      licitation.status = LicitationStatus.CLOSED;
+      licitation.closedAt = new Date();
+      await this.licitationRepository.save(licitation);
+
+      // Update related quotations: set status to FINALIZED if they are in CREATED
+      const quotations = await this.quotationRepository.find({
+        where: { licitationId: id },
+      });
+
+      for (const quotation of quotations) {
+        if (quotation.status === QuotationStatus.CREATED) {
+          quotation.status = QuotationStatus.FINALIZED;
+          await this.quotationRepository.save(quotation);
+          this.logger.debug(
+            `Quotation ${quotation.id} marked as FINALIZED due to licitation closure`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Licitation closed successfully: ID ${id}, call number: ${licitation.callNumber}`,
+      );
+      return this.findOne(id);
+    } catch (error) {
+      this.logger.error(
+        `Failed to close licitation with ID: ${id}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw error;

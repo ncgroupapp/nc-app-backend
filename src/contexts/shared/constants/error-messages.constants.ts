@@ -36,6 +36,7 @@ export const ERROR_MESSAGES = {
     NOT_FOUND: (id: string | number) => `Licitación con ID ${id} no encontrada`,
     INVALID_DATE_RANGE: "Rango de fechas inválido: la fecha límite debe ser posterior a la fecha de inicio",
     PRODUCT_REQUIRED: "Se requiere al menos un producto para crear una licitación",
+    ALREADY_CLOSED: "La licitación ya se encuentra cerrada",
   },
   MANUALS: {
     NOT_FOUND: (id: string | number) => `Manual con ID ${id} no encontrado`,

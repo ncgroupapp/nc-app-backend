@@ -326,7 +326,7 @@ export class AdjudicationsService {
     await this.licitationRepository.save(licitation);
   }
 
-  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number, productId?: number): Promise<PaginatedResult<Adjudication>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number, productId?: number, closedOnly?: boolean): Promise<PaginatedResult<Adjudication>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const queryBuilder = this.adjudicationRepository.createQueryBuilder('adjudication')
@@ -336,6 +336,15 @@ export class AdjudicationsService {
       .orderBy('adjudication.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
+
+    // Filter based on closedOnly parameter
+    if (closedOnly === true) {
+      // Only adjudications from closed licitations
+      queryBuilder.andWhere('licitation.status = :closedStatus', { closedStatus: LicitationStatus.CLOSED });
+    } else {
+      // By default, exclude adjudications from closed licitations
+      queryBuilder.andWhere('licitation.status != :closedStatus', { closedStatus: LicitationStatus.CLOSED });
+    }
 
     if (search) {
       // Cast the numeric ID to text to search along with potential string references

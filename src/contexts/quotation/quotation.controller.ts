@@ -68,6 +68,12 @@ export class QuotationController {
     required: false,
     description: "Filtrar por ID de cliente",
   })
+  @ApiQuery({
+    name: "closedOnly",
+    required: false,
+    description: "Mostrar solo cotizaciones de licitaciones cerradas",
+    type: Boolean,
+  })
   @ApiResponse({
     status: 200,
     description: "Lista de cotizaciones obtenida exitosamente",
@@ -79,7 +85,14 @@ export class QuotationController {
     @Query("clientId") clientId?: string,
     @Query("productId") productId?: string,
   ) {
-    return this.quotationService.findAll(paginationDto, search, status, clientId ? +clientId : undefined, productId ? +productId : undefined);
+    return this.quotationService.findAll(
+      paginationDto,
+      search,
+      status,
+      clientId ? +clientId : undefined,
+      productId ? +productId : undefined,
+      paginationDto.closedOnly,
+    );
   }
 
   @Get("by-client/:clientId")
