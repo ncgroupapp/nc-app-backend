@@ -45,6 +45,7 @@ export const ERROR_MESSAGES = {
     NOT_FOUND: (id: string | number) => `Cotización con ID ${id} no encontrada`,
     IDENTIFIER_ALREADY_EXISTS: (id: string) => `Ya existe una cotización con el identificador: ${id}`,
     IDENTIFIER_NOT_FOUND: (id: string) => `Cotización con identificador ${id} no encontrada`,
+    ITEM_NOT_FOUND: (id: string | number) => `Item de cotización con ID ${id} no encontrado`,
   },
   IMPORTS: {
     NOT_FOUND: (id: string | number) => `Importación con ID ${id} no encontrada`,

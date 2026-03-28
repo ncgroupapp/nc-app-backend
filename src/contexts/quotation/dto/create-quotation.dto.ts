@@ -67,12 +67,12 @@ export class CreateQuotationItemDto {
 
   @ApiProperty({ description: 'Precio cotizado sin IVA' })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   priceWithoutIVA!: number;
 
   @ApiProperty({ description: 'Precio cotizado con IVA' })
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   priceWithIVA!: number;
 
   @ApiProperty({ description: 'Porcentaje de IVA', default: 19 })

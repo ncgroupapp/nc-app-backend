@@ -21,6 +21,7 @@ export interface UpdateDeliveryItemDto {
   actualDate?: Date;
   observations?: string;
   quantity?: number;
+  estimatedDate?: Date;
 }
 
 export interface CreateInvoiceDto {

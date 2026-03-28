@@ -378,4 +378,41 @@ export class QuotationService {
       itemsByCurrency,
     };
   }
+
+  async updateItemAwardStatus(
+    quotationId: number,
+    itemId: number,
+    awardStatus: QuotationAwardStatus,
+    awardedQuantity?: number,
+  ): Promise<void> {
+    // Verificar que la cotización existe
+    const quotation = await this.findOne(quotationId);
+
+    // Buscar el item
+    const item = quotation.items.find((i) => i.id === itemId);
+    if (!item) {
+      throw new NotFoundException(ERROR_MESSAGES.QUOTATION.ITEM_NOT_FOUND(itemId));
+    }
+
+    // Si es PENDING, limpiar awardedQuantity
+    if (awardStatus === QuotationAwardStatus.PENDING) {
+      item.awardStatus = awardStatus;
+      item.awardedQuantity = undefined;
+    }
+    // Si es PARTIALLY_AWARDED, usar la cantidad proporcionada
+    else if (awardStatus === QuotationAwardStatus.PARTIALLY_AWARDED) {
+      item.awardStatus = awardStatus;
+      item.awardedQuantity = awardedQuantity || item.quantity;
+    }
+    // Para AWARDED o NOT_AWARDED, simplemente actualizar el estado
+    else {
+      item.awardStatus = awardStatus;
+      // Para AWARDED, la cantidad adjudicada es la total
+      if (awardStatus === QuotationAwardStatus.AWARDED) {
+        item.awardedQuantity = item.quantity;
+      }
+    }
+
+    await this.quotationItemRepository.save(item);
+  }
 }
