@@ -181,13 +181,15 @@ export class AdjudicationsService {
     let savedAdjudication: Adjudication;
 
     if (existingAdjudication) {
-      // Collect product IDs being awarded now
-      const awardedProductIds = newItems.map(item => item.productId);
+      // Solo eliminamos items si explícitamente se indica que NO fueron adjudicados
+      // ya que el frontend envía deltas (un item a la vez)
+      const rejectedProductIds = (createAdjudicationDto.nonAwardedItems || [])
+        .map(item => item.productId)
+        .filter(id => id !== undefined);
 
-      // Remove items that are no longer part of the award or moved to nonAwardedItems
-      if (existingAdjudication.items) {
+      if (existingAdjudication.items && rejectedProductIds.length > 0) {
         for (const item of [...existingAdjudication.items]) {
-          if (!awardedProductIds.includes(item.productId)) {
+          if (item.productId && rejectedProductIds.includes(item.productId)) {
             await this.adjudicationItemRepository.remove(item);
             existingAdjudication.items = existingAdjudication.items.filter(i => i.id !== item.id);
           }
@@ -492,6 +494,35 @@ export class AdjudicationsService {
   }
 
   /**
+   * Elimina un producto específico de la adjudicación y sincroniza entregas.
+   */
+  async removeProductFromAdjudication(quotationId: number, productId: number): Promise<void> {
+    const adjudication = await this.adjudicationRepository.findOne({
+      where: { quotationId },
+      relations: ['items'],
+    });
+
+    if (!adjudication || !adjudication.items) return;
+
+    const itemToRemove = adjudication.items.find(item => item.productId === productId);
+    if (itemToRemove) {
+      await this.adjudicationItemRepository.remove(itemToRemove);
+      
+      adjudication.items = adjudication.items.filter(item => item.id !== itemToRemove.id);
+      
+      const allItems = adjudication.items || [];
+      adjudication.totalQuantity = allItems.reduce((sum, item) => sum + item.quantity, 0);
+      adjudication.totalPriceWithoutIVA = allItems.reduce((sum, item) => sum + (item.quantity * Number(item.unitPrice)), 0);
+      adjudication.totalPriceWithIVA = adjudication.totalPriceWithoutIVA * 1.19;
+      
+      const savedAdjudication = await this.adjudicationRepository.save(adjudication);
+      
+      await this.updateLicitationStatus(savedAdjudication.licitationId);
+      await this.deliveriesService.addItemsFromAdjudication(savedAdjudication);
+    }
+  }
+
+  /**
    * Actualiza la cantidad adjudicada de un item de cotización
    * También actualiza la cantidad en el DeliveryItem correspondiente
    */
@@ -524,28 +555,39 @@ export class AdjudicationsService {
 
     await this.quotationItemRepository.save(quotationItem);
 
-    // Buscar y actualizar el DeliveryItem correspondiente
     const quotation = quotationItem.quotation;
-    if (quotation) {
-      // Buscar la adjudicación de esta cotización para tener el discriminador
-      const adjudication = await this.adjudicationRepository.findOne({
-        where: { quotationId: quotation.id }
-      });
 
-      // Buscar la entrega de esta licitación
-      if (!quotation.licitationId || !adjudication) return quotationItem;
-      const delivery = await this.deliveriesService.findByLicitation(quotation.licitationId);
-      if (delivery) {
-        // Buscar el item de entrega para este producto Y esta adjudicación
-        const deliveryItem = delivery.items?.find(
-          (item) => item.productId === quotationItem.productId && item.adjudicationId === adjudication.id
-        );
-        if (deliveryItem) {
-          await this.deliveriesService.updateItemStatus(
-            delivery.id, 
-            deliveryItem.id, 
-            { quantity: newQuantity }
-          );
+    if (newQuantity <= 0 && quotationItem.productId) {
+      // Si la cantidad es 0, removemos de la adjudicación y entregas
+      if (quotationItem.quotationId) {
+        await this.removeProductFromAdjudication(quotationItem.quotationId, quotationItem.productId);
+      }
+    } else {
+      // Buscar y actualizar el DeliveryItem correspondiente
+      if (quotation) {
+        // Buscar la adjudicación de esta cotización para tener el discriminador
+        const adjudication = await this.adjudicationRepository.findOne({
+          where: { quotationId: quotation.id }
+        });
+
+        // Buscar la entrega de esta licitación
+        if (!quotation.licitationId || !adjudication) {
+          // If no delivery or adjudication yet, we still update the quotation item
+        } else {
+          const delivery = await this.deliveriesService.findByLicitation(quotation.licitationId);
+          if (delivery) {
+            // Buscar el item de entrega para este producto Y esta adjudicación
+            const deliveryItem = delivery.items?.find(
+              (item) => item.productId === quotationItem.productId && item.adjudicationId === adjudication.id
+            );
+            if (deliveryItem) {
+              await this.deliveriesService.updateItemStatus(
+                delivery.id, 
+                deliveryItem.id, 
+                { quantity: newQuantity }
+              );
+            }
+          }
         }
       }
     }

@@ -414,5 +414,12 @@ export class QuotationService {
     }
 
     await this.quotationItemRepository.save(item);
+
+    // Sincronizar entregas: Si pasa a PENDING o NOT_AWARDED, se elimina de adjudicaciones y entregas
+    if (awardStatus === QuotationAwardStatus.PENDING || awardStatus === QuotationAwardStatus.NOT_AWARDED) {
+      if (item.productId) {
+        await this.adjudicationsService.removeProductFromAdjudication(quotationId, item.productId);
+      }
+    }
   }
 }
