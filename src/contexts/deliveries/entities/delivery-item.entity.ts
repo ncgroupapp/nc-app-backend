@@ -7,6 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
+import type { Delivery } from './delivery.entity';
 
 export enum DeliveryItemStatus {
   PENDING = 'pendiente_entrega',
@@ -23,9 +24,12 @@ export class DeliveryItem {
   @Column({ type: 'int' })
   deliveryId!: number;
 
-  @ManyToOne('Delivery', 'items', { onDelete: 'CASCADE' })
+  @ManyToOne(() => Delivery, (delivery) => delivery.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'deliveryId' })
-  delivery!: any;
+  delivery!: Delivery;
+
+  @Column({ type: 'int', nullable: true })
+  adjudicationId?: number;
 
   @Column({ type: 'int', nullable: true })
   productId?: number;

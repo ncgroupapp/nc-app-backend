@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Adjudication, AdjudicationStatus, AdjudicationItem } from './entities/adjudication.entity';
 import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
+import { AddAdjudicationItemDto } from './dto/add-adjudication-item.dto';
 import { DeliveriesService } from '@/contexts/deliveries/deliveries.service';
 import { Quotation, QuotationItem, QuotationAwardStatus } from '@/contexts/quotation/entities/quotation.entity';
 import { Licitation, LicitationStatus } from '@/contexts/licitations/entities/licitation.entity';
@@ -180,6 +181,19 @@ export class AdjudicationsService {
     let savedAdjudication: Adjudication;
 
     if (existingAdjudication) {
+      // Collect product IDs being awarded now
+      const awardedProductIds = newItems.map(item => item.productId);
+
+      // Remove items that are no longer part of the award or moved to nonAwardedItems
+      if (existingAdjudication.items) {
+        for (const item of [...existingAdjudication.items]) {
+          if (!awardedProductIds.includes(item.productId)) {
+            await this.adjudicationItemRepository.remove(item);
+            existingAdjudication.items = existingAdjudication.items.filter(i => i.id !== item.id);
+          }
+        }
+      }
+
       // Check for existing items and update or create
       for (const newItem of newItems) {
         // Check if item with same productId already exists
@@ -385,7 +399,7 @@ export class AdjudicationsService {
   async findOne(id: number): Promise<Adjudication> {
     const adjudication = await this.adjudicationRepository.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'licitation'],
     });
 
     if (!adjudication) {
@@ -419,27 +433,36 @@ export class AdjudicationsService {
     });
   }
 
-  async addItem(adjudicationId: number, itemDto: any): Promise<Adjudication> {
+  /**
+   * Agrega un item a una adjudicación existente
+   * @param adjudicationId - ID de la adjudicación
+   * @param itemDto - Datos del item a agregar
+   * @returns La adjudicación actualizada con el nuevo item
+   */
+  async addItem(adjudicationId: number, itemDto: AddAdjudicationItemDto): Promise<Adjudication> {
     // Find the adjudication
     const adjudication = await this.findOne(adjudicationId);
 
-    // Create the new item
+    // Create the new item with explicit properties
     const newItem = this.adjudicationItemRepository.create({
-      ...itemDto,
+      productId: itemDto.productId,
+      quantity: itemDto.quantity,
+      unitPrice: itemDto.unitPrice,
+      productName: '', // Will be populated if needed
       adjudicationId,
     });
 
-    // Save the new item
-    const savedItem = (await this.adjudicationItemRepository.save(newItem)) as unknown as AdjudicationItem;
+    // Save the new item - TypeORM returns the entity with proper type
+    const savedItem = await this.adjudicationItemRepository.save(newItem);
 
     // Recalculate totals
     const existingItems = adjudication.items || [];
     const allItems: AdjudicationItem[] = [...existingItems, savedItem];
-    
+
     let totalPriceWithoutIVA = 0;
     let totalQuantity = 0;
 
-    allItems.forEach((item: any) => {
+    allItems.forEach((item: AdjudicationItem) => {
       totalQuantity += item.quantity;
       totalPriceWithoutIVA += Number(item.unitPrice) * item.quantity;
     });
@@ -452,7 +475,7 @@ export class AdjudicationsService {
     adjudication.totalQuantity = totalQuantity;
 
     const savedAdjudication = await this.adjudicationRepository.save(adjudication);
-    
+
     // Update Licitation Status
     await this.updateLicitationStatus(savedAdjudication.licitationId);
 
@@ -504,13 +527,18 @@ export class AdjudicationsService {
     // Buscar y actualizar el DeliveryItem correspondiente
     const quotation = quotationItem.quotation;
     if (quotation) {
+      // Buscar la adjudicación de esta cotización para tener el discriminador
+      const adjudication = await this.adjudicationRepository.findOne({
+        where: { quotationId: quotation.id }
+      });
+
       // Buscar la entrega de esta licitación
-      if (!quotation.licitationId) return quotationItem;
+      if (!quotation.licitationId || !adjudication) return quotationItem;
       const delivery = await this.deliveriesService.findByLicitation(quotation.licitationId);
       if (delivery) {
-        // Buscar el item de entrega para este producto
+        // Buscar el item de entrega para este producto Y esta adjudicación
         const deliveryItem = delivery.items?.find(
-          (item) => item.productId === quotationItem.productId
+          (item) => item.productId === quotationItem.productId && item.adjudicationId === adjudication.id
         );
         if (deliveryItem) {
           await this.deliveriesService.updateItemStatus(

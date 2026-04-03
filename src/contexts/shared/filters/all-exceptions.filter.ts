@@ -8,66 +8,85 @@ import {
 } from "@nestjs/common";
 import { FastifyReply } from "fastify";
 
-@Catch() // Captura todas las excepciones
+/**
+ * PostgreSQL error structure with detail property
+ */
+interface PostgresError extends Error {
+  detail?: string;
+  code?: string;
+}
+
+/**
+ * HTTP error response structure
+ */
+interface ErrorResponse {
+  success: boolean;
+  data: string | Record<string, unknown>;
+}
+
+@Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
-  async catch(exception: any, host: ArgumentsHost) {
+  async catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
-    const response: any = ctx.getResponse<FastifyReply>(); // Obtén el objeto FastifyReply pero lo declaro como any ya que no reconoce los metodos
+    const response = ctx.getResponse<FastifyReply>();
 
-    // Determina el estado de la excepción
+    // Determine status code
     let status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    // Determine error message
     let message =
       exception instanceof HttpException
         ? exception.getResponse()
-        : (exception.message ?? "Internal server error");
+        : (exception instanceof Error ? exception.message : "Internal server error");
 
-    // Postgres unique violation error (based on detail message)
-    if (
-      exception?.detail &&
-      typeof exception.detail === "string" &&
-      exception.detail.includes("already exists")
-    ) {
-      const match = exception.detail.match(
-        /Key \((.+)\)=\((.+)\) already exists/,
-      );
+    // Handle PostgreSQL unique constraint violations
+    if (this.isPostgresError(exception)) {
+      if (exception.detail && exception.detail.includes("already exists")) {
+        const match = exception.detail.match(
+          /Key \((.+)\)=\((.+)\) already exists/,
+        );
 
-      if (match) {
-        status = HttpStatus.CONFLICT;
-        const field = match[1];
-        const value = match[2];
+        if (match) {
+          status = HttpStatus.CONFLICT;
+          const field = match[1];
+          const value = match[2];
 
-        if (field === "code") {
-          message = `El código '${value}' ya existe`;
-        } else {
-          message = `Ya existe un registro con el valor '${value}' en el campo '${field}'`;
+          if (field === "code" || field === "sku" || field === "rut") {
+            message = `El ${field === 'rut' ? 'RUT' : field === 'sku' ? 'SKU' : 'código'} '${value}' ya existe`;
+          } else {
+            message = `Ya existe un registro con el valor '${value}' en el campo '${field}'`;
+          }
         }
       }
     }
 
-    // Log de la excepción
+    // Log the exception
     this.logger.error(
       `HTTP Status: ${status} Error Message: ${JSON.stringify(message)}`,
     );
 
-    if (response.code) {
-      await response.code(status).send({
-        success: false,
-        data: message,
-      });
-    } else {
-      response.writeHead(status, { "Content-Type": "application/json" });
-      await response.end(
-        JSON.stringify({
-          success: false,
-          data: message,
-        }),
-      );
-    }
+    // Send response
+    const responseBody: ErrorResponse = {
+      success: false,
+      data: message as string,
+    };
+
+    await response.code(status).send(responseBody);
+  }
+
+  /**
+   * Type guard to check if error is a PostgreSQL error
+   */
+  private isPostgresError(error: unknown): error is PostgresError {
+    return (
+      error instanceof Error &&
+      "detail" in error &&
+      typeof error.detail === "string"
+    );
   }
 }

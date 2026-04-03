@@ -31,10 +31,10 @@ export class Delivery {
   @JoinColumn({ name: 'licitationId' })
   licitation!: Licitation;
 
-  @OneToMany('DeliveryItem', 'delivery', { cascade: true, eager: true })
+  @OneToMany(() => DeliveryItem, (item) => item.delivery, { cascade: true, eager: true })
   items!: DeliveryItem[];
 
-  @OneToMany('Invoice', 'delivery', { cascade: true })
+  @OneToMany(() => Invoice, (invoice) => invoice.delivery, { cascade: true })
   invoices!: Invoice[];
 
   @Column({ type: 'text', nullable: true })

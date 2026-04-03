@@ -104,6 +104,12 @@ export class ProvidersService {
     return this.providerRepository.findOne({ where: { rut } });
   }
 
+  /**
+   * Actualiza un proveedor existente
+   * @param id - ID del proveedor a actualizar
+   * @param updateProviderDto - Datos a actualizar
+   * @returns El proveedor actualizado
+   */
   async update(
     id: number,
     updateProviderDto: UpdateProviderDto,
@@ -119,8 +125,8 @@ export class ProvidersService {
     }
 
     try {
-      const updateData: any = { ...updateProviderDto };
-      Object.assign(provider, updateData);
+      // Merge DTO properties into provider entity
+      Object.assign(provider, updateProviderDto);
       const updatedProvider = await this.providerRepository.save(provider);
       this.logger.log(
         `Provider updated successfully: ID ${id}, RUT: ${updatedProvider.rut}`,

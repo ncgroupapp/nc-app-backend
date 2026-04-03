@@ -53,17 +53,59 @@ export class ImportsService {
     return this.importRepository.save(newImport);
   }
 
-  async findAll(paginationDto: PaginationDto, status?: string, providerId?: number, fromDate?: string, toDate?: string): Promise<PaginatedResult<Import>> {
+  /**
+   * Finds all imports with optional filters
+   * @param paginationDto - Pagination parameters
+   * @param status - Filter by status
+   * @param providerId - Filter by provider ID
+   * @param fromDate - Filter by import start date
+   * @param toDate - Filter by import end date
+   * @returns Paginated imports
+   */
+  async findAll(
+    paginationDto: PaginationDto,
+    status?: string,
+    providerId?: number,
+    fromDate?: string,
+    toDate?: string
+  ): Promise<PaginatedResult<Import>> {
     const { page = 1, limit = 10 } = paginationDto;
-    const where: any = {};
+
+    // Build query with conditions
+    const queryBuilder = this.importRepository
+      .createQueryBuilder('import')
+      .leftJoinAndSelect('import.provider', 'provider')
+      .orderBy('import.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
     if (status) {
-      where.status = status;
+      queryBuilder.andWhere('import.status = :status', { status });
     }
 
     if (providerId) {
-      where.provider = { id: providerId };
+      queryBuilder.andWhere('provider.id = :providerId', { providerId });
     }
+
+    if (fromDate && toDate) {
+      queryBuilder.andWhere('import.importDate BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      });
+    }
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
+  }
 
     if (fromDate && toDate) {
       where.importDate = Between(fromDate, toDate);
