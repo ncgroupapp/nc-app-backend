@@ -25,3 +25,7 @@ lerna-debug.log*
 
 # Test coverage
 coverage/
+
+.agents/
+.agent/
+.claude/
