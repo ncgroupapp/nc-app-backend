@@ -6,8 +6,9 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Relation,
 } from 'typeorm';
-import type { Delivery } from './delivery.entity';
+import { Delivery } from './delivery.entity';
 
 export enum DeliveryItemStatus {
   PENDING = 'pendiente_entrega',
@@ -26,7 +27,7 @@ export class DeliveryItem {
 
   @ManyToOne(() => Delivery, (delivery) => delivery.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'deliveryId' })
-  delivery!: Delivery;
+  delivery!: Relation<Delivery>;
 
   @Column({ type: 'int', nullable: true })
   adjudicationId?: number;

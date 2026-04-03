@@ -167,7 +167,7 @@ export class AdjudicationsService {
             competitorName: itemDto.competitorName,
             competitorRut: itemDto.competitorRut,
             competitorPrice: itemDto.competitorPrice,
-            quantity: itemDto.quantity,
+            quantity: itemDto.quantity || 0,
             competitorBrand: itemDto.competitorBrand,
           };
           

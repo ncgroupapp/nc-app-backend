@@ -5,8 +5,9 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Relation,
 } from 'typeorm';
-import type { Delivery } from './delivery.entity';
+import { Delivery } from './delivery.entity';
 
 @Entity('invoices')
 export class Invoice {
@@ -18,7 +19,7 @@ export class Invoice {
 
   @ManyToOne(() => Delivery, (delivery) => delivery.invoices, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'deliveryId' })
-  delivery!: Delivery;
+  delivery!: Relation<Delivery>;
 
   @Column({ type: 'varchar', length: 100 })
   invoiceNumber!: string;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { Quotation } from './entities/quotation.entity';
+import { Quotation, QuotationAwardStatus } from './entities/quotation.entity';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -166,7 +166,7 @@ export class QuotationPdfService {
         const rowHeight = 20;
 
         // Columnas: CANT. | DETALLE / ARTÍCULO | MARCA | ORIGEN | V. UNIT (SIN IVA) | P.UNIT TOTAL | TOTAL
-        const columns = [
+        const columns: Array<{ label: string, width: number, align: 'left' | 'center' | 'right' | 'justify' }> = [
           { label: 'CANT.', width: 40, align: 'center' },
           { label: 'DETALLE / ARTÍCULO', width: 160, align: 'left' },
           { label: 'MARCA', width: 50, align: 'center' },
@@ -242,7 +242,7 @@ export class QuotationPdfService {
           });
 
           // V. UNIT (SIN IVA)
-          const priceUnit = item.awardStatus === 'NOT_AWARDED'
+          const priceUnit = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
             ? (item.competitorInfo?.winnerPrice || 0)
             : Number(item.priceWithoutIVA);
           doc.text(
@@ -253,7 +253,7 @@ export class QuotationPdfService {
           );
 
           // P.UNIT TOTAL
-          const priceUnitTotal = item.awardStatus === 'NOT_AWARDED'
+          const priceUnitTotal = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
             ? (item.competitorInfo?.winnerPrice || 0)
             : Number(item.priceWithIVA);
           doc.text(
@@ -264,7 +264,7 @@ export class QuotationPdfService {
           );
 
           // TOTAL
-          const total = item.awardStatus === 'NOT_AWARDED'
+          const total = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
             ? (item.competitorInfo?.winnerPrice || 0) * item.quantity
             : Number(item.priceWithIVA) * item.quantity;
           doc.text(
@@ -374,14 +374,14 @@ export class QuotationPdfService {
           .text(quotation.validity || '15 días', infoLeftX + 110, validezY);
 
         const subtotal = quotation.items.reduce((acc, item) => {
-          const price = item.awardStatus === 'NOT_AWARDED'
+          const price = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
             ? (item.competitorInfo?.winnerPrice || 0)
             : Number(item.priceWithoutIVA);
           return acc + (price * item.quantity);
         }, 0);
 
         const total = quotation.items.reduce((acc, item) => {
-          const price = item.awardStatus === 'NOT_AWARDED'
+          const price = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
             ? (item.competitorInfo?.winnerPrice || 0)
             : Number(item.priceWithIVA);
           return acc + (price * item.quantity);

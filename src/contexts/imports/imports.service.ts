@@ -107,33 +107,6 @@ export class ImportsService {
     };
   }
 
-    if (fromDate && toDate) {
-      where.importDate = Between(fromDate, toDate);
-    } else if (fromDate) {
-      where.importDate = MoreThanOrEqual(fromDate);
-    } else if (toDate) {
-      where.importDate = LessThanOrEqual(toDate);
-    }
-
-    const [data, total] = await this.importRepository.findAndCount({
-      where,
-      relations: ['provider', 'products', 'licitations'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        lastPage: Math.ceil(total / limit),
-        limit,
-      },
-    };
-  }
-
   async findOne(id: number): Promise<Import> {
     const importEntity = await this.importRepository.findOne({
       where: { id },

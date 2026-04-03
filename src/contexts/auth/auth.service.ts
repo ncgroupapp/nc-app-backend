@@ -64,7 +64,10 @@ export class AuthService {
     // Password comparison would go here if UserService returned password
     // For now, LocalStrategy handles validation
 
-    return user;
+    return {
+      id: user.id,
+      email: user.email,
+    } as AuthUser;
   }
 
   /**
@@ -78,7 +81,6 @@ export class AuthService {
     const payload: JwtPayload = {
       email: user.email,
       sub: user.id,
-      role: user.role,
     };
 
     return {
@@ -96,6 +98,9 @@ export class AuthService {
     refreshToken: string;
   } {
     const accessSecret = this.configService.get<string>("JWT_ACCESS_SECRET");
+    if (!accessSecret) {
+      throw new Error("JWT_ACCESS_SECRET no está configurado.");
+    }
     const accessExpiresIn = this.configService.get<string>("JWT_ACCESS_EXPIRES_IN");
 
     const refreshSecret = this.configService.get<string>("JWT_REFRESH_SECRET");
@@ -110,7 +115,7 @@ export class AuthService {
     };
 
     const accessToken = jwt.sign(tokenPayload, accessSecret, {
-      expiresIn: accessExpiresIn,
+      expiresIn: accessExpiresIn as any,
     });
 
     const refreshTokenPayload: JwtPayload = {
@@ -119,7 +124,7 @@ export class AuthService {
     };
 
     const refreshToken = jwt.sign(refreshTokenPayload, refreshSecret, {
-      expiresIn: refreshExpiresIn,
+      expiresIn: refreshExpiresIn as any,
     });
 
     return {

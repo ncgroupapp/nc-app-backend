@@ -20,7 +20,7 @@ export class LoggerMiddleware implements NestMiddleware {
     };
 
     if (isFastifyReply(res)) {
-      res.on("finish", () => {
+      res.raw.on("finish", () => {
         const statusCode = res.statusCode;
         const contentLength = res.getHeader("content-length");
         this.logger.log(
