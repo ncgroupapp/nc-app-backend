@@ -1,15 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { CreateImportDto } from './dto/create-import.dto';
 import { UpdateImportDto } from './dto/update-import.dto';
 import { Import } from './entities/import.entity';
 import { Product } from '../products/entities/product.entity';
 import { Licitation } from '../licitations/entities/licitation.entity';
 import { Provider } from '../providers/entities/provider.entity';
-import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
+import { FilterImportsDto } from './dto/filter-imports.dto';
 
 @Injectable()
 export class ImportsService {
@@ -53,33 +53,50 @@ export class ImportsService {
     return this.importRepository.save(newImport);
   }
 
-  async findAll(paginationDto: PaginationDto, status?: string, providerId?: number, fromDate?: string, toDate?: string): Promise<PaginatedResult<Import>> {
-    const { page = 1, limit = 10 } = paginationDto;
-    const where: any = {};
+  async findAll(filters?: FilterImportsDto): Promise<PaginatedResult<Import>> {
+    const { page = 1, limit = 10 } = filters || {};
 
-    if (status) {
-      where.status = status;
+    const queryBuilder = this.importRepository
+      .createQueryBuilder('import')
+      .leftJoinAndSelect('import.provider', 'provider')
+      .leftJoinAndSelect('import.products', 'products')
+      .leftJoinAndSelect('import.licitations', 'licitations')
+      .orderBy('import.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (filters) {
+      if (filters.status) {
+        queryBuilder.andWhere('import.status ILIKE :status', { status: `%${filters.status}%` });
+      }
+
+      if (filters.providerIds && filters.providerIds.length > 0) {
+        queryBuilder.andWhere('provider.id IN (:...providerIds)', { providerIds: filters.providerIds });
+      } else if (filters.providerId) {
+        queryBuilder.andWhere('provider.id = :providerId', { providerId: filters.providerId });
+      }
+
+      if (filters.importDate) {
+        queryBuilder.andWhere('DATE(import.importDate) = :importDate', { importDate: filters.importDate });
+      } else {
+        if (filters.fromDate) {
+          queryBuilder.andWhere('DATE(import.importDate) >= :fromDate', { fromDate: filters.fromDate });
+        }
+
+        if (filters.toDate) {
+          queryBuilder.andWhere('DATE(import.importDate) <= :toDate', { toDate: filters.toDate });
+        }
+
+        if (filters.search) {
+          queryBuilder.andWhere(
+            '(import.folder ILIKE :search OR import.transport ILIKE :search OR provider.name ILIKE :search)',
+            { search: `%${filters.search}%` },
+          );
+        }
+      }
     }
 
-    if (providerId) {
-      where.provider = { id: providerId };
-    }
-
-    if (fromDate && toDate) {
-      where.importDate = Between(fromDate, toDate);
-    } else if (fromDate) {
-      where.importDate = MoreThanOrEqual(fromDate);
-    } else if (toDate) {
-      where.importDate = LessThanOrEqual(toDate);
-    }
-
-    const [data, total] = await this.importRepository.findAndCount({
-      where,
-      relations: ['provider', 'products', 'licitations'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const [data, total] = await queryBuilder.getManyAndCount();
 
     return {
       data,

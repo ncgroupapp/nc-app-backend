@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseInterceptors } from '@nestjs/common';
-import { ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ImportsService } from './imports.service';
 import { CreateImportDto } from './dto/create-import.dto';
 import { UpdateImportDto } from './dto/update-import.dto';
-import { PaginationDto } from "../shared/dto/pagination.dto";
+import { FilterImportsDto } from './dto/filter-imports.dto';
+import { Import } from './entities/import.entity';
+import { PaginatedResult } from '../shared/interfaces/paginated-result.interface';
 import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
 @ApiTags('imports')
@@ -18,18 +20,10 @@ export class ImportsController {
   }
 
   @Get()
-  @ApiQuery({ name: 'status', required: false })
-  @ApiQuery({ name: 'providerId', required: false, type: Number })
-  @ApiQuery({ name: 'fromDate', required: false })
-  @ApiQuery({ name: 'toDate', required: false })
-  findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query('status') status?: string,
-    @Query('providerId') providerId?: number,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
-  ) {
-    return this.importsService.findAll(paginationDto, status, providerId, fromDate, toDate);
+  @ApiOperation({ summary: 'Get all imports with optional filters' })
+  @ApiResponse({ status: 200, description: 'List of imports', type: [Import] })
+  findAll(@Query() filters: FilterImportsDto): Promise<PaginatedResult<Import>> {
+    return this.importsService.findAll(filters);
   }
 
   @Get(':id')
