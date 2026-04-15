@@ -117,15 +117,25 @@ export class AdjudicationsService {
         });
 
         if (quotationItem) {
-          const currentAwarded = quotationItem.awardedQuantity || 0;
-          const newAwarded = currentAwarded + itemDto.quantity;
+          // Buscar si ya existe este item en la adjudicación para no duplicar la cantidad adjudicada
+          const existingItemInAdjudication = existingAdjudication?.items?.find(
+            i => i.productId === itemDto.productId
+          );
+
+          const previousQuantityInAdjudication = existingItemInAdjudication ? existingItemInAdjudication.quantity : 0;
+          const currentAwardedTotal = quotationItem.awardedQuantity || 0;
+          
+          // La nueva cantidad total adjudicada es: (total anterior) - (lo que ya estaba en esta adjudicación) + (lo nuevo)
+          const newAwarded = currentAwardedTotal - previousQuantityInAdjudication + itemDto.quantity;
           
           quotationItem.awardedQuantity = newAwarded;
 
           if (newAwarded >= quotationItem.quantity) {
             quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
-          } else {
+          } else if (newAwarded > 0) {
             quotationItem.awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
+          } else {
+            quotationItem.awardStatus = QuotationAwardStatus.PENDING;
           }
           await this.quotationItemRepository.save(quotationItem);
         }
@@ -541,20 +551,6 @@ export class AdjudicationsService {
       );
     }
 
-    // Actualizar la cantidad adjudicada
-    quotationItem.awardedQuantity = newQuantity;
-
-    // Actualizar el estado según la cantidad
-    if (newQuantity >= quotationItem.quantity) {
-      quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
-    } else if (newQuantity > 0) {
-      quotationItem.awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
-    } else {
-      quotationItem.awardStatus = QuotationAwardStatus.PENDING;
-    }
-
-    await this.quotationItemRepository.save(quotationItem);
-
     const quotation = quotationItem.quotation;
 
     if (newQuantity <= 0 && quotationItem.productId) {
@@ -562,41 +558,26 @@ export class AdjudicationsService {
       if (quotationItem.quotationId) {
         await this.removeProductFromAdjudication(quotationItem.quotationId, quotationItem.productId);
       }
-    } else {
-      // Buscar y actualizar el DeliveryItem correspondiente
-      if (quotation) {
-        // Buscar la adjudicación de esta cotización para tener el discriminador
-        const adjudication = await this.adjudicationRepository.findOne({
-          where: { quotationId: quotation.id }
-        });
-
-        // Buscar la entrega de esta licitación
-        if (!quotation.licitationId || !adjudication) {
-          // If no delivery or adjudication yet, we still update the quotation item
-        } else {
-          const delivery = await this.deliveriesService.findByLicitation(quotation.licitationId);
-          if (delivery) {
-            // Buscar el item de entrega para este producto Y esta adjudicación
-            const deliveryItem = delivery.items?.find(
-              (item) => item.productId === quotationItem.productId && item.adjudicationId === adjudication.id
-            );
-            if (deliveryItem) {
-              await this.deliveriesService.updateItemStatus(
-                delivery.id, 
-                deliveryItem.id, 
-                { quantity: newQuantity }
-              );
-            }
-          }
-        }
-      }
+    } else if (quotation.licitationId) {
+      // Usar el método create para sincronizar todo (Cotización, Adjudicación, Stock, Entrega)
+      await this.create({
+        licitationId: quotation.licitationId,
+        quotationId: quotation.id,
+        status: newQuantity >= quotationItem.quantity ? AdjudicationStatus.TOTAL : AdjudicationStatus.PARTIAL,
+        items: [{
+          productId: quotationItem.productId!,
+          quantity: newQuantity,
+          unitPrice: quotationItem.priceWithoutIVA,
+          productName: quotationItem.productName || '',
+        }],
+      });
     }
 
-    // Actualizar estado de la licitación si es necesario
-    if (quotation && quotation.licitationId) {
-      await this.updateLicitationStatus(quotation.licitationId);
-    }
-
-    return quotationItem;
+    // Retornar el item actualizado
+    const updatedItem = await this.quotationItemRepository.findOne({
+      where: { id: quotationItemId }
+    });
+    
+    return updatedItem || quotationItem;
   }
 }

@@ -66,7 +66,7 @@ export class QuotationService {
           productName = product.name;
         }
         if (!productName) {
-          throw new NotFoundException('Se requiere productName o un productId válido');
+          throw new NotFoundException(ERROR_MESSAGES.QUOTATION.PRODUCT_OR_NAME_REQUIRED);
         }
         return this.quotationItemRepository.create({
           ...item,
@@ -134,7 +134,7 @@ export class QuotationService {
   async findOne(id: number): Promise<Quotation> {
     const quotation = await this.quotationRepository.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'items.product'],
     });
 
     if (!quotation) {
@@ -203,7 +203,7 @@ export class QuotationService {
         }
 
         if (!productName) {
-          throw new NotFoundException('Se requiere productName o un productId válido');
+          throw new NotFoundException(ERROR_MESSAGES.QUOTATION.PRODUCT_OR_NAME_REQUIRED);
         }
 
         // Recalcular awardStatus si el item tiene awardedQuantity
@@ -415,8 +415,24 @@ export class QuotationService {
 
     await this.quotationItemRepository.save(item);
 
-    // Sincronizar entregas: Si pasa a PENDING o NOT_AWARDED, se elimina de adjudicaciones y entregas
-    if (awardStatus === QuotationAwardStatus.PENDING || awardStatus === QuotationAwardStatus.NOT_AWARDED) {
+    // Sincronizar con el sistema de adjudicaciones y entregas
+    if (awardStatus === QuotationAwardStatus.AWARDED || awardStatus === QuotationAwardStatus.PARTIALLY_AWARDED) {
+      // Si pasa a adjudicado (total o parcial), creamos/actualizamos la adjudicación
+      if (item.productId && item.awardedQuantity && item.awardedQuantity > 0 && quotation.licitationId) {
+        await this.adjudicationsService.create({
+          licitationId: quotation.licitationId,
+          quotationId: quotation.id,
+          status: awardStatus === QuotationAwardStatus.AWARDED ? AdjudicationStatus.TOTAL : AdjudicationStatus.PARTIAL,
+          items: [{
+            productId: item.productId,
+            quantity: item.awardedQuantity,
+            unitPrice: item.priceWithoutIVA,
+            productName: item.productName || '',
+          }],
+        });
+      }
+    } else if (awardStatus === QuotationAwardStatus.PENDING || awardStatus === QuotationAwardStatus.NOT_AWARDED) {
+      // Si pasa a PENDING o NOT_AWARDED, se elimina de adjudicaciones y entregas
       if (item.productId) {
         await this.adjudicationsService.removeProductFromAdjudication(quotationId, item.productId);
       }

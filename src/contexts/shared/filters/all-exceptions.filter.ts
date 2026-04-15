@@ -44,6 +44,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getResponse()
         : (exception instanceof Error ? exception.message : "Internal server error");
 
+    // Flatten error message if it's an object (common in NestJS/class-validator)
+    if (typeof message === "object" && message !== null) {
+      const responseObj = message as any;
+      if (Array.isArray(responseObj.message)) {
+        message = responseObj.message.join(", ");
+      } else if (typeof responseObj.message === "string") {
+        message = responseObj.message;
+      } else if (responseObj.error && typeof responseObj.error === "string") {
+        message = responseObj.error;
+      } else {
+        message = JSON.stringify(message);
+      }
+    }
+
     // Handle PostgreSQL unique constraint violations
     if (this.isPostgresError(exception)) {
       if (exception.detail && exception.detail.includes("already exists")) {

@@ -122,7 +122,7 @@ export class LicitationsService {
 
     if (search) {
       queryBuilder.andWhere(
-        "(licitation.callNumber ILIKE :search OR licitation.internalNumber ILIKE :search OR client.name ILIKE :search)",
+        "(licitation.callNumber ILIKE :search OR licitation.internalNumber ILIKE :search OR client.name ILIKE :search OR product.code ILIKE :search OR array_to_string(product.equivalentCodes, ',') ILIKE :search)",
         { search: `%${search}%` }
       );
     }
@@ -220,6 +220,21 @@ export class LicitationsService {
     if (productsWithQuantity.length > 0) {
       await this.validateProductsExist(productsWithQuantity.map(p => p.productId));
       
+      // Identify products being removed to check for conflicts
+      const currentProductIds = licitation.licitationProducts?.map(lp => lp.productId) || [];
+      const newProductIds = productsWithQuantity.map(p => p.productId);
+      const removedProductIds = currentProductIds.filter(pid => !newProductIds.includes(pid));
+
+      for (const productId of removedProductIds) {
+        const hasConflict = await this.checkQuotationConflict(id, productId);
+        if (hasConflict) {
+          const product = licitation.licitationProducts?.find(lp => lp.productId === productId)?.product;
+          throw new BadRequestException(
+            `No se puede eliminar el producto "${product?.name || productId}" porque ya tiene cotizaciones asociadas en esta licitación.`
+          );
+        }
+      }
+
       // Remove existing products
       await this.licitationProductRepository.delete({ licitationId: id });
       
@@ -249,6 +264,18 @@ export class LicitationsService {
       );
       throw error;
     }
+  }
+
+  private async checkQuotationConflict(licitationId: number, productId: number): Promise<boolean> {
+    const quotations = await this.quotationRepository.find({
+      where: { licitationId },
+      relations: ["items"],
+    });
+
+    // Check if any quotation item references this product
+    return quotations.some(q => 
+      q.items.some(item => item.productId === productId)
+    );
   }
 
   async remove(id: number): Promise<void> {
