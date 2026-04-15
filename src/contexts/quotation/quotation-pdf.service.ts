@@ -232,7 +232,7 @@ export class QuotationPdfService {
           doc.text(item.productName, colPositions[2].x + 2, detailY, {
             width: colPositions[2].width - 4,
             align: 'left',
-            maxLines: 1
+            lineBreak: false
           });
 
           // Marca
