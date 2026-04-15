@@ -165,15 +165,16 @@ export class QuotationPdfService {
         const tableY = immInfoY + 32;
         const rowHeight = 20;
 
-        // Columnas: CANT. | DETALLE / ARTÍCULO | MARCA | ORIGEN | V. UNIT (SIN IVA) | P.UNIT TOTAL | TOTAL
+        // Columnas: CANT. | CÓDIGO | DETALLE / ARTÍCULO | MARCA | ORIGEN | V. UNIT (SIN IVA) | P.UNIT TOTAL | TOTAL
         const columns: Array<{ label: string, width: number, align: 'left' | 'center' | 'right' | 'justify' }> = [
-          { label: 'CANT.', width: 40, align: 'center' },
-          { label: 'DETALLE / ARTÍCULO', width: 160, align: 'left' },
-          { label: 'MARCA', width: 50, align: 'center' },
-          { label: 'ORIGEN', width: 55, align: 'center' },
-          { label: 'V. UNIT (SIN IVA)', width: 70, align: 'right' },
+          { label: 'CANT.', width: 35, align: 'center' },
+          { label: 'CÓDIGO', width: 60, align: 'left' },
+          { label: 'DETALLE / ARTÍCULO', width: 135, align: 'left' },
+          { label: 'MARCA', width: 45, align: 'center' },
+          { label: 'ORIGEN', width: 45, align: 'center' },
+          { label: 'V. UNIT (SIN IVA)', width: 65, align: 'right' },
           { label: 'P.UNIT TOTAL', width: 65, align: 'right' },
-          { label: 'TOTAL', width: 75, align: 'right' },
+          { label: 'TOTAL', width: 70, align: 'right' },
         ];
 
         let colX = contentX;
@@ -218,28 +219,35 @@ export class QuotationPdfService {
             align: 'center'
           });
 
-          // Detalle (nombre + marca)
-          const detailY = currentY + 4;
-          doc.text(item.productName, colPositions[1].x + 2, detailY, {
+          // Código
+          const productCode = (item as any).product?.code || '-';
+          doc.fontSize(7).text(productCode, colPositions[1].x + 2, currentY + 6, {
             width: colPositions[1].width - 4,
             align: 'left'
           });
-          if (item.brand) {
-            doc
-              .fontSize(7)
-              .fillColor('#888888')
-              .text(item.brand, colPositions[2].x + 2, detailY + 8, {
-                width: colPositions[2].width - 4,
-                align: 'center'
-              });
-            doc.fontSize(8).fillColor('#333333');
-          }
+          doc.fontSize(8);
 
-          // Origen
-          doc.text(item.origin || '-', colPositions[3].x + 2, currentY + 6, {
+          // Detalle
+          const detailY = currentY + 6;
+          doc.text(item.productName, colPositions[2].x + 2, detailY, {
+            width: colPositions[2].width - 4,
+            align: 'left',
+            maxLines: 1
+          });
+
+          // Marca
+          doc.fontSize(7).text(item.brand || '-', colPositions[3].x + 2, currentY + 6, {
             width: colPositions[3].width - 4,
             align: 'center'
           });
+          doc.fontSize(8);
+
+          // Origen
+          doc.fontSize(7).text(item.origin || '-', colPositions[4].x + 2, currentY + 6, {
+            width: colPositions[4].width - 4,
+            align: 'center'
+          });
+          doc.fontSize(8);
 
           // V. UNIT (SIN IVA)
           const priceUnit = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
@@ -247,9 +255,9 @@ export class QuotationPdfService {
             : Number(item.priceWithoutIVA);
           doc.text(
             `${priceUnit.toFixed(2)}`,
-            colPositions[4].x + 2,
+            colPositions[5].x + 2,
             currentY + 6,
-            { width: colPositions[4].width - 4, align: 'right' }
+            { width: colPositions[5].width - 4, align: 'right' }
           );
 
           // P.UNIT TOTAL
@@ -258,9 +266,9 @@ export class QuotationPdfService {
             : Number(item.priceWithIVA);
           doc.text(
             `${priceUnitTotal.toFixed(2)}`,
-            colPositions[5].x + 2,
+            colPositions[6].x + 2,
             currentY + 6,
-            { width: colPositions[5].width - 4, align: 'right' }
+            { width: colPositions[6].width - 4, align: 'right' }
           );
 
           // TOTAL
@@ -269,9 +277,9 @@ export class QuotationPdfService {
             : Number(item.priceWithIVA) * item.quantity;
           doc.text(
             `${total.toFixed(2)}`,
-            colPositions[6].x + 2,
+            colPositions[7].x + 2,
             currentY + 6,
-            { width: colPositions[6].width - 4, align: 'right' }
+            { width: colPositions[7].width - 4, align: 'right' }
           );
 
           // Bordes
