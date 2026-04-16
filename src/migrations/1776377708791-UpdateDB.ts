@@ -4,15 +4,15 @@ export class UpdateDB1776377708791 implements MigrationInterface {
   name = "UpdateDB1776377708791";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // 1. Agregamos las nuevas columnas de forma segura
+    // 1. Agregamos las nuevas columnas con IF NOT EXISTS para evitar choques si ya se crearon
     await queryRunner.query(
-      `ALTER TABLE "licitations" ADD "closedAt" TIMESTAMP`,
+      `ALTER TABLE "licitations" ADD COLUMN IF NOT EXISTS "closedAt" TIMESTAMP`,
     );
     await queryRunner.query(
-      `ALTER TABLE "delivery_items" ADD "adjudicationId" integer`,
+      `ALTER TABLE "delivery_items" ADD COLUMN IF NOT EXISTS "adjudicationId" integer`,
     );
 
-    // 2. CORRECCIÓN CRÍTICA: Convertimos de Date a Timestamp SIN borrar la columna
+    // 2. Convertimos de Date a Timestamp SIN borrar la columna
     await queryRunner.query(
       `ALTER TABLE "licitations" ALTER COLUMN "startDate" TYPE TIMESTAMP USING "startDate"::timestamp`,
     );
@@ -20,7 +20,7 @@ export class UpdateDB1776377708791 implements MigrationInterface {
       `ALTER TABLE "licitations" ALTER COLUMN "deadlineDate" TYPE TIMESTAMP USING "deadlineDate"::timestamp`,
     );
 
-    // 3. Actualización del ENUM (El método de TypeORM es largo, pero es el más seguro para transacciones)
+    // 3. Actualización del ENUM
     await queryRunner.query(
       `ALTER TYPE "public"."licitations_status_enum" RENAME TO "licitations_status_enum_old"`,
     );
@@ -45,12 +45,9 @@ export class UpdateDB1776377708791 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Revertimos la restricción del código
     await queryRunner.query(
       `ALTER TABLE "products" ALTER COLUMN "code" SET NOT NULL`,
     );
-
-    // Revertimos el ENUM a su estado anterior
     await queryRunner.query(
       `CREATE TYPE "public"."licitations_status_enum_old" AS ENUM('Pending', 'Quoted', 'Partial Adjudication', 'Not Adjudicated', 'Total Adjudication')`,
     );
@@ -67,16 +64,12 @@ export class UpdateDB1776377708791 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TYPE "public"."licitations_status_enum_old" RENAME TO "licitations_status_enum"`,
     );
-
-    // CORRECCIÓN CRÍTICA DOWN: Revertimos a Date sin borrar las columnas
     await queryRunner.query(
       `ALTER TABLE "licitations" ALTER COLUMN "deadlineDate" TYPE date USING "deadlineDate"::date`,
     );
     await queryRunner.query(
       `ALTER TABLE "licitations" ALTER COLUMN "startDate" TYPE date USING "startDate"::date`,
     );
-
-    // Eliminamos las columnas nuevas
     await queryRunner.query(
       `ALTER TABLE "delivery_items" DROP COLUMN "adjudicationId"`,
     );
