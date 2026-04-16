@@ -9,7 +9,7 @@ import {
   OneToMany,
 } from "typeorm";
 import { Client } from "@/contexts/clients/entities/client.entity";
-import { Quotation } from "@/contexts/quotation/entities/quotation.entity";
+import type { Quotation } from "@/contexts/quotation/entities/quotation.entity";
 import type { LicitationProduct } from "./licitation-product.entity";
 
 export enum LicitationStatus {
@@ -51,7 +51,7 @@ export class Licitation {
   })
   licitationProducts?: LicitationProduct[];
 
-  @OneToMany(() => Quotation, (quotation) => quotation.licitation)
+  @OneToMany('Quotation', (quotation: Quotation) => quotation.licitation)
   quotations?: Quotation[];
 
   @Column({
