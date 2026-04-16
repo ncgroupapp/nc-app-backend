@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToMany, JoinTable } from 'typeorm';
 import { Provider } from '../../providers/entities/provider.entity';
+import type { QuotationHistoryEntry, AdjudicationHistoryEntry } from '../../shared/types/product-history.types';
 
 @Entity('products')
 export class Product {
@@ -31,7 +32,7 @@ export class Product {
   @Column({ type: 'varchar', length: 100, nullable: true})
   model?: string;
 
-  @Column({ type: 'varchar', length: 100, unique: true })
+  @Column({ type: 'varchar', length: 100, unique: true, nullable: true })
   code?: string;
 
   @Column('text', { array: true, nullable: true })
@@ -56,10 +57,10 @@ export class Product {
   equipment?: string;
 
   @Column({ type: 'json', nullable: true })
-  quotationHistory?: any[];
+  quotationHistory?: QuotationHistoryEntry[];
 
   @Column({ type: 'json', nullable: true })
-  adjudicationHistory?: any[];
+  adjudicationHistory?: AdjudicationHistoryEntry[];
 
   // Legacy fields for backward compatibility
   @Column({ type: 'text', nullable: true })

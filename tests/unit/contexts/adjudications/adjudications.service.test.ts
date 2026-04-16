@@ -18,4 +18,12 @@ describe('AdjudicationsService source regression', () => {
     expect(source).toContain("queryBuilder.andWhere('adjudication.licitationId = :licitationId', { licitationId });");
     expect(source).toContain("queryBuilder.andWhere('items.productId = :productId', { productId });");
   });
+
+  it('ensures findOne method includes licitation in relations', () => {
+    // Find the findOne method content
+    const findOneMatch = source.match(/async findOne\(id: number\): Promise<Adjudication> {([\s\S]*?)return adjudication;/);
+    expect(findOneMatch).not.toBeNull();
+    const findOneContent = findOneMatch![1];
+    expect(findOneContent).toContain("relations: ['items', 'licitation']");
+  });
 });

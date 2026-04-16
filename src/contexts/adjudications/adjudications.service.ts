@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Adjudication, AdjudicationStatus, AdjudicationItem } from './entities/adjudication.entity';
 import { CreateAdjudicationDto } from './dto/create-adjudication.dto';
+import { AddAdjudicationItemDto } from './dto/add-adjudication-item.dto';
 import { DeliveriesService } from '@/contexts/deliveries/deliveries.service';
 import { Quotation, QuotationItem, QuotationAwardStatus } from '@/contexts/quotation/entities/quotation.entity';
 import { Licitation, LicitationStatus } from '@/contexts/licitations/entities/licitation.entity';
@@ -116,15 +117,25 @@ export class AdjudicationsService {
         });
 
         if (quotationItem) {
-          const currentAwarded = quotationItem.awardedQuantity || 0;
-          const newAwarded = currentAwarded + itemDto.quantity;
+          // Buscar si ya existe este item en la adjudicación para no duplicar la cantidad adjudicada
+          const existingItemInAdjudication = existingAdjudication?.items?.find(
+            i => i.productId === itemDto.productId
+          );
+
+          const previousQuantityInAdjudication = existingItemInAdjudication ? existingItemInAdjudication.quantity : 0;
+          const currentAwardedTotal = quotationItem.awardedQuantity || 0;
+          
+          // La nueva cantidad total adjudicada es: (total anterior) - (lo que ya estaba en esta adjudicación) + (lo nuevo)
+          const newAwarded = currentAwardedTotal - previousQuantityInAdjudication + itemDto.quantity;
           
           quotationItem.awardedQuantity = newAwarded;
 
           if (newAwarded >= quotationItem.quantity) {
             quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
-          } else {
+          } else if (newAwarded > 0) {
             quotationItem.awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
+          } else {
+            quotationItem.awardStatus = QuotationAwardStatus.PENDING;
           }
           await this.quotationItemRepository.save(quotationItem);
         }
@@ -166,7 +177,7 @@ export class AdjudicationsService {
             competitorName: itemDto.competitorName,
             competitorRut: itemDto.competitorRut,
             competitorPrice: itemDto.competitorPrice,
-            quantity: itemDto.quantity,
+            quantity: itemDto.quantity || 0,
             competitorBrand: itemDto.competitorBrand,
           };
           
@@ -180,6 +191,21 @@ export class AdjudicationsService {
     let savedAdjudication: Adjudication;
 
     if (existingAdjudication) {
+      // Solo eliminamos items si explícitamente se indica que NO fueron adjudicados
+      // ya que el frontend envía deltas (un item a la vez)
+      const rejectedProductIds = (createAdjudicationDto.nonAwardedItems || [])
+        .map(item => item.productId)
+        .filter(id => id !== undefined);
+
+      if (existingAdjudication.items && rejectedProductIds.length > 0) {
+        for (const item of [...existingAdjudication.items]) {
+          if (item.productId && rejectedProductIds.includes(item.productId)) {
+            await this.adjudicationItemRepository.remove(item);
+            existingAdjudication.items = existingAdjudication.items.filter(i => i.id !== item.id);
+          }
+        }
+      }
+
       // Check for existing items and update or create
       for (const newItem of newItems) {
         // Check if item with same productId already exists
@@ -326,7 +352,7 @@ export class AdjudicationsService {
     await this.licitationRepository.save(licitation);
   }
 
-  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number, productId?: number): Promise<PaginatedResult<Adjudication>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, quotationId?: number, licitationId?: number, productId?: number, closedOnly?: boolean): Promise<PaginatedResult<Adjudication>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const queryBuilder = this.adjudicationRepository.createQueryBuilder('adjudication')
@@ -336,6 +362,15 @@ export class AdjudicationsService {
       .orderBy('adjudication.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
+
+    // Filter based on closedOnly parameter
+    if (closedOnly === true) {
+      // Only adjudications from closed licitations
+      queryBuilder.andWhere('licitation.status = :closedStatus', { closedStatus: LicitationStatus.CLOSED });
+    } else {
+      // By default, exclude adjudications from closed licitations
+      queryBuilder.andWhere('licitation.status != :closedStatus', { closedStatus: LicitationStatus.CLOSED });
+    }
 
     if (search) {
       // Cast the numeric ID to text to search along with potential string references
@@ -376,7 +411,7 @@ export class AdjudicationsService {
   async findOne(id: number): Promise<Adjudication> {
     const adjudication = await this.adjudicationRepository.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'licitation'],
     });
 
     if (!adjudication) {
@@ -410,27 +445,36 @@ export class AdjudicationsService {
     });
   }
 
-  async addItem(adjudicationId: number, itemDto: any): Promise<Adjudication> {
+  /**
+   * Agrega un item a una adjudicación existente
+   * @param adjudicationId - ID de la adjudicación
+   * @param itemDto - Datos del item a agregar
+   * @returns La adjudicación actualizada con el nuevo item
+   */
+  async addItem(adjudicationId: number, itemDto: AddAdjudicationItemDto): Promise<Adjudication> {
     // Find the adjudication
     const adjudication = await this.findOne(adjudicationId);
 
-    // Create the new item
+    // Create the new item with explicit properties
     const newItem = this.adjudicationItemRepository.create({
-      ...itemDto,
+      productId: itemDto.productId,
+      quantity: itemDto.quantity,
+      unitPrice: itemDto.unitPrice,
+      productName: '', // Will be populated if needed
       adjudicationId,
     });
 
-    // Save the new item
-    const savedItem = (await this.adjudicationItemRepository.save(newItem)) as unknown as AdjudicationItem;
+    // Save the new item - TypeORM returns the entity with proper type
+    const savedItem = await this.adjudicationItemRepository.save(newItem);
 
     // Recalculate totals
     const existingItems = adjudication.items || [];
     const allItems: AdjudicationItem[] = [...existingItems, savedItem];
-    
+
     let totalPriceWithoutIVA = 0;
     let totalQuantity = 0;
 
-    allItems.forEach((item: any) => {
+    allItems.forEach((item: AdjudicationItem) => {
       totalQuantity += item.quantity;
       totalPriceWithoutIVA += Number(item.unitPrice) * item.quantity;
     });
@@ -443,7 +487,7 @@ export class AdjudicationsService {
     adjudication.totalQuantity = totalQuantity;
 
     const savedAdjudication = await this.adjudicationRepository.save(adjudication);
-    
+
     // Update Licitation Status
     await this.updateLicitationStatus(savedAdjudication.licitationId);
 
@@ -457,6 +501,35 @@ export class AdjudicationsService {
     
     // Update Licitation Status after removal
     await this.updateLicitationStatus(licitationId);
+  }
+
+  /**
+   * Elimina un producto específico de la adjudicación y sincroniza entregas.
+   */
+  async removeProductFromAdjudication(quotationId: number, productId: number): Promise<void> {
+    const adjudication = await this.adjudicationRepository.findOne({
+      where: { quotationId },
+      relations: ['items'],
+    });
+
+    if (!adjudication || !adjudication.items) return;
+
+    const itemToRemove = adjudication.items.find(item => item.productId === productId);
+    if (itemToRemove) {
+      await this.adjudicationItemRepository.remove(itemToRemove);
+      
+      adjudication.items = adjudication.items.filter(item => item.id !== itemToRemove.id);
+      
+      const allItems = adjudication.items || [];
+      adjudication.totalQuantity = allItems.reduce((sum, item) => sum + item.quantity, 0);
+      adjudication.totalPriceWithoutIVA = allItems.reduce((sum, item) => sum + (item.quantity * Number(item.unitPrice)), 0);
+      adjudication.totalPriceWithIVA = adjudication.totalPriceWithoutIVA * 1.19;
+      
+      const savedAdjudication = await this.adjudicationRepository.save(adjudication);
+      
+      await this.updateLicitationStatus(savedAdjudication.licitationId);
+      await this.deliveriesService.addItemsFromAdjudication(savedAdjudication);
+    }
   }
 
   /**
@@ -478,46 +551,33 @@ export class AdjudicationsService {
       );
     }
 
-    // Actualizar la cantidad adjudicada
-    quotationItem.awardedQuantity = newQuantity;
-
-    // Actualizar el estado según la cantidad
-    if (newQuantity >= quotationItem.quantity) {
-      quotationItem.awardStatus = QuotationAwardStatus.AWARDED;
-    } else if (newQuantity > 0) {
-      quotationItem.awardStatus = QuotationAwardStatus.PARTIALLY_AWARDED;
-    } else {
-      quotationItem.awardStatus = QuotationAwardStatus.PENDING;
-    }
-
-    await this.quotationItemRepository.save(quotationItem);
-
-    // Buscar y actualizar el DeliveryItem correspondiente
     const quotation = quotationItem.quotation;
-    if (quotation) {
-      // Buscar la entrega de esta licitación
-      if (!quotation.licitationId) return quotationItem;
-      const delivery = await this.deliveriesService.findByLicitation(quotation.licitationId);
-      if (delivery) {
-        // Buscar el item de entrega para este producto
-        const deliveryItem = delivery.items?.find(
-          (item) => item.productId === quotationItem.productId
-        );
-        if (deliveryItem) {
-          await this.deliveriesService.updateItemStatus(
-            delivery.id, 
-            deliveryItem.id, 
-            { quantity: newQuantity }
-          );
-        }
+
+    if (newQuantity <= 0 && quotationItem.productId) {
+      // Si la cantidad es 0, removemos de la adjudicación y entregas
+      if (quotationItem.quotationId) {
+        await this.removeProductFromAdjudication(quotationItem.quotationId, quotationItem.productId);
       }
+    } else if (quotation.licitationId) {
+      // Usar el método create para sincronizar todo (Cotización, Adjudicación, Stock, Entrega)
+      await this.create({
+        licitationId: quotation.licitationId,
+        quotationId: quotation.id,
+        status: newQuantity >= quotationItem.quantity ? AdjudicationStatus.TOTAL : AdjudicationStatus.PARTIAL,
+        items: [{
+          productId: quotationItem.productId!,
+          quantity: newQuantity,
+          unitPrice: quotationItem.priceWithoutIVA,
+          productName: quotationItem.productName || '',
+        }],
+      });
     }
 
-    // Actualizar estado de la licitación si es necesario
-    if (quotation && quotation.licitationId) {
-      await this.updateLicitationStatus(quotation.licitationId);
-    }
-
-    return quotationItem;
+    // Retornar el item actualizado
+    const updatedItem = await this.quotationItemRepository.findOne({
+      where: { id: quotationItemId }
+    });
+    
+    return updatedItem || quotationItem;
   }
 }

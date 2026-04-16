@@ -193,22 +193,29 @@ export class ProductsService {
     }
   }
 
+  /**
+   * Deletes a product by ID
+   * @param id - Product ID to delete
+   * @throws ConflictException if product has associated offers
+   */
   async remove(id: number): Promise<void> {
     this.logger.log(`Deleting product with ID: ${id}`);
     const product = await this.findOne(id);
 
     try {
       await this.productRepository.remove(product);
-      this.logger.log(
-        `Product deleted successfully: ID ${id}`,
-      );
-    } catch (error: any) {
+      this.logger.log(`Product deleted successfully: ID ${id}`);
+    } catch (error: unknown) {
+      // Handle PostgreSQL foreign key constraint violation
+      const dbError = error as { code?: string; table?: string; message?: string };
+
       if (
-        error?.code === '23503' &&
-        (error?.table === 'offers' || error?.message?.includes('table "offers"'))
+        dbError?.code === '23503' &&
+        (dbError?.table === 'offers' || dbError?.message?.includes('table "offers"'))
       ) {
         throw new ConflictException(ERROR_MESSAGES.PRODUCTS.CANNOT_DELETE_HAS_OFFERS);
       }
+
       this.logger.error(
         `Failed to delete product with ID: ${id}`,
         error instanceof Error ? error.stack : String(error),

@@ -39,9 +39,9 @@ export class ProductWithQuantityDto {
 export class CreateLicitationDto {
   @ApiProperty({
     description: "Start date of the licitation",
-    example: "2024-01-15",
+    example: "2024-01-15T12:00:00",
     type: String,
-    format: "date",
+    format: "date-time",
   })
   @IsDateString()
   @IsNotEmpty()
@@ -49,9 +49,9 @@ export class CreateLicitationDto {
 
   @ApiProperty({
     description: "Deadline date of the licitation",
-    example: "2024-02-15",
+    example: "2024-02-15T18:00:00",
     type: String,
-    format: "date",
+    format: "date-time",
   })
   @IsDateString()
   @IsNotEmpty()

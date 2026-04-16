@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Relation,
 } from 'typeorm';
 import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
 import { DeliveryItem, DeliveryItemStatus } from './delivery-item.entity';
@@ -29,13 +30,13 @@ export class Delivery {
 
   @ManyToOne(() => Licitation)
   @JoinColumn({ name: 'licitationId' })
-  licitation!: Licitation;
+  licitation!: Relation<Licitation>;
 
-  @OneToMany('DeliveryItem', 'delivery', { cascade: true, eager: true })
-  items!: DeliveryItem[];
+  @OneToMany(() => DeliveryItem, (item) => item.delivery, { cascade: true, eager: true })
+  items!: Relation<DeliveryItem>[];
 
-  @OneToMany('Invoice', 'delivery', { cascade: true })
-  invoices!: Invoice[];
+  @OneToMany(() => Invoice, (invoice) => invoice.delivery, { cascade: true })
+  invoices!: Relation<Invoice>[];
 
   @Column({ type: 'text', nullable: true })
   observations?: string;

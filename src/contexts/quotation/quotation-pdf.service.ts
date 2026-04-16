@@ -1,25 +1,31 @@
 import { Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { Quotation } from './entities/quotation.entity';
+import { Quotation, QuotationAwardStatus } from './entities/quotation.entity';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class QuotationPdfService {
   /**
-   * Genera un PDF de la cotización
+   * Genera un PDF de la cotización con diseño completo
    * @param quotation - Cotización a convertir en PDF
    * @returns Promise<Buffer> - Buffer del PDF generado
    */
   async generatePdf(quotation: Quotation): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       try {
-        // Crear documento PDF
-        const doc = new PDFDocument({ 
+        const doc = new PDFDocument({
           size: 'A4',
-          margins: { top: 50, bottom: 50, left: 50, right: 50 }
+          margins: { top: 35, bottom: 50, left: 35, right: 35 },
+          info: {
+            Title: `Cotización ${quotation.quotationIdentifier}`,
+            Author: 'Nicolas Cornalino',
+            Subject: quotation.clientName || '',
+          }
         });
-        
+
         const buffers: Buffer[] = [];
-        
+
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => {
           const pdfBuffer = Buffer.concat(buffers);
@@ -27,384 +33,474 @@ export class QuotationPdfService {
         });
         doc.on('error', reject);
 
-        // Encabezado
+        const pageWidth = 595.28;
+        const centerX = pageWidth / 2;
+        const contentX = 35;
+        const contentWidth = pageWidth - 70;
+
+        // === HEADER ===
+        const headerY = 10;
+
+        // Logo
+        try {
+          const logoPath = join(process.cwd(), 'assets', 'logo.png');
+          const logoBuffer = readFileSync(logoPath);
+          doc.image(logoBuffer, contentX, headerY, { width: 65 });
+        } catch (logoError) {
+          // Continuar sin logo si no se encuentra
+        }
+
+        // Título y número centrados
         doc
           .fontSize(18)
           .font('Helvetica-Bold')
-          .text('COTIZACIÓN', { align: 'center' })
-          .moveDown(1);
-
-        // Información del cliente y cotización
-        const tableTop = doc.y;
-        const leftTableX = 60;
-        const leftTableWidth = 260;
-        const rightTableX = 340;
-        const rightTableWidth = 200;
-        const rowHeight = 25;
-
-        doc.fontSize(9).font('Helvetica-Bold');
-        
-        // TABLA IZQUIERDA
-        // Fila 1: CLIENTE
-        doc
           .fillColor('#4472C4')
-          .rect(leftTableX, tableTop, 90, rowHeight)
-          .fill()
-          .fillColor('white')
-          .text('CLIENTE', leftTableX + 5, tableTop + 8, { width: 80 });
+          .text('COTIZACIÓN', centerX, headerY + 8, { align: 'center' });
 
         doc
-          .fillColor('black')
-          .rect(leftTableX + 90, tableTop, leftTableWidth - 90, rowHeight)
-          .stroke()
-          .font('Helvetica')
-          .text(quotation.clientName || 'N/A', leftTableX + 95, tableTop + 8, { width: leftTableWidth - 100 });
+          .fontSize(11)
+          .fillColor('#666666')
+          .text(quotation.quotationIdentifier, centerX, headerY + 30, { align: 'center' });
 
-        // Fila 2: COMPRA
-        const row2Y = tableTop + rowHeight;
+        // Línea decorativa
         doc
-          .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(leftTableX, row2Y, 90, rowHeight)
-          .fill()
-          .fillColor('white')
-          .text('COMPRA', leftTableX + 5, row2Y + 8, { width: 80 });
-
-        doc
-          .fillColor('black')
-          .rect(leftTableX + 90, row2Y, leftTableWidth - 90, rowHeight)
-          .stroke()
-          .font('Helvetica')
-          .text(quotation.associatedPurchase || quotation.quotationIdentifier, leftTableX + 95, row2Y + 8, { width: leftTableWidth - 100 });
-
-        // TABLA DERECHA
-        // Fila 1: IMM
-        doc
-          .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(rightTableX, tableTop, 60, rowHeight)
-          .fill()
-          .fillColor('white')
-          .text('IMM', rightTableX + 5, tableTop + 8, { width: 50 });
-
-        doc
-          .fillColor('black')
-          .rect(rightTableX + 60, tableTop, rightTableWidth - 60, rowHeight)
+          .moveTo(contentX, headerY + 45)
+          .lineTo(contentX + contentWidth, headerY + 45)
+          .strokeColor('#e0e0e0')
+          .lineWidth(1)
           .stroke();
 
-        // Fila 2: APERT
-        doc
-          .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(rightTableX, row2Y, 60, rowHeight)
-          .fill()
-          .fillColor('white')
-          .text('APERT', rightTableX + 5, row2Y + 8, { width: 50 });
+        // === INFO CLIENTE ===
+        const infoY = headerY + 55;
 
         doc
-          .fillColor('black')
-          .rect(rightTableX + 60, row2Y, rightTableWidth - 60, rowHeight)
-          .stroke()
+          .fontSize(8)
           .font('Helvetica')
-          .text(quotation.quotationDate ? new Date(quotation.quotationDate).toLocaleDateString('es-CL') : '', rightTableX + 65, row2Y + 8, { width: rightTableWidth - 70 });
+          .fillColor('#666666')
+          .text('CLIENTE:', contentX, infoY);
 
-        // Fila 3: HORA
-        const row3Y = row2Y + rowHeight;
         doc
+          .fontSize(11)
           .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(rightTableX, row3Y, 60, rowHeight)
-          .fill()
-          .fillColor('white')
-          .text('HORA', rightTableX + 5, row3Y + 8, { width: 50 });
+          .fillColor('#333333')
+          .text(quotation.clientName || 'N/A', contentX + 45, infoY, { width: 250 });
+
+        // === INFO FECHA ===
+        const dateInfoY = infoY + 22;
+        const quoteDate = quotation.quotationDate || quotation.createdAt;
+        const dateStr = quoteDate
+          ? new Date(quoteDate).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          : new Date().toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        // Formato 24h para la hora (sin p.m./a.m.)
+        const timeStr = quoteDate
+          ? new Date(quoteDate).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false })
+          : '';
 
         doc
-          .fillColor('black')
-          .rect(rightTableX + 60, row3Y, rightTableWidth - 60, rowHeight)
-          .stroke()
+          .fontSize(8)
           .font('Helvetica')
-          .text(quotation.quotationDate ? new Date(quotation.quotationDate).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' p.m.' : '', rightTableX + 65, row3Y + 8, { width: rightTableWidth - 70 });
+          .fillColor('#666666')
+          .text('FECHA:', contentX, dateInfoY);
 
-        doc.moveDown(3);
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(dateStr, contentX + 45, dateInfoY, { width: 150 });
 
-        // Tabla de items
-        const itemsTableTop = doc.y;
-        const startX = 60;
-        
-        // Definir columnas con anchos ajustados
-        const columns = [
-          { label: 'CANT.', width: 30, align: 'center' as const },
-          { label: 'DETALLE / ARTÍCULO', width: 170, align: 'left' as const },
-          { label: 'MARCA', width: 60, align: 'center' as const },
-          { label: 'ORIGEN', width: 50, align: 'center' as const },
-          { label: 'V. UNIT (SIN IVA)', width: 60, align: 'right' as const },
-          { label: 'TOTAL IVA', width: 60, align: 'right' as const },
-          { label: 'TOTAL', width: 65, align: 'right' as const },
+        // === IMM, APERT, HORA ===
+        const immInfoY = dateInfoY + 22;
+
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('IMM:', contentX, immInfoY);
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(quotation.clientName || 'N/A', contentX + 45, immInfoY, { width: 200 });
+
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('APERT:', contentX + 260, immInfoY);
+
+        // APERT usa validUntil (fecha de validez)
+        const validUntilStr = quotation.validUntil
+          ? new Date(quotation.validUntil).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          : '-';
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(validUntilStr, contentX + 315, immInfoY, { width: 60 });
+
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('HORA:', contentX + 390, immInfoY);
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(timeStr, contentX + 435, immInfoY);
+
+        // Línea decorativa
+        doc
+          .moveTo(contentX, immInfoY + 22)
+          .lineTo(contentX + contentWidth, immInfoY + 22)
+          .strokeColor('#e0e0e0')
+          .lineWidth(1)
+          .stroke();
+
+        // === TABLA DE ITEMS ===
+        const tableY = immInfoY + 32;
+        const rowHeight = 20;
+
+        // Columnas: CANT. | CÓDIGO | DETALLE / ARTÍCULO | MARCA | ORIGEN | V. UNIT (SIN IVA) | P.UNIT TOTAL | TOTAL
+        const columns: Array<{ label: string, width: number, align: 'left' | 'center' | 'right' | 'justify' }> = [
+          { label: 'CANT.', width: 35, align: 'center' },
+          { label: 'CÓDIGO', width: 60, align: 'left' },
+          { label: 'DETALLE / ARTÍCULO', width: 135, align: 'left' },
+          { label: 'MARCA', width: 45, align: 'center' },
+          { label: 'ORIGEN', width: 45, align: 'center' },
+          { label: 'V. UNIT (SIN IVA)', width: 65, align: 'right' },
+          { label: 'P.UNIT TOTAL', width: 65, align: 'right' },
+          { label: 'TOTAL', width: 70, align: 'right' },
         ];
 
-        // Calcular posiciones X para cada columna
-        let currentX = startX;
-        const columnPositions = columns.map(col => {
-          const pos = currentX;
-          currentX += col.width;
+        let colX = contentX;
+        const colPositions = columns.map(col => {
+          const pos = colX;
+          colX += col.width;
           return { ...col, x: pos };
         });
 
-        // Encabezados de la tabla con fondo azul
-        doc.fontSize(7).font('Helvetica-Bold');
-        const headerHeight = 35;
-        
-        columnPositions.forEach(col => {
+        // Header de tabla
+        const headerHeight = 26;
+        doc
+          .fillColor('#4472C4')
+          .rect(contentX, tableY, contentWidth, headerHeight)
+          .fill();
+
+        colPositions.forEach(col => {
           doc
-            .fillColor('#4472C4')
-            .rect(col.x, itemsTableTop, col.width, headerHeight)
-            .fill()
             .fillColor('white')
-            .text(col.label, col.x + 2, itemsTableTop + 10, {
+            .fontSize(7)
+            .font('Helvetica-Bold')
+            .text(col.label, col.x + 2, tableY + 8, {
               width: col.width - 4,
               align: col.align
             });
         });
 
         // Items
-        let currentY = itemsTableTop + headerHeight;
-        const itemRowHeight = 25;
-        doc.font('Helvetica').fontSize(8);
+        let currentY = tableY + headerHeight;
+        doc.font('Helvetica').fontSize(8).fillColor('#333333');
 
         quotation.items.forEach((item, index) => {
-          // Fondo blanco alternado
+          // Fondo alternado
           if (index % 2 === 0) {
-            doc.fillColor('#f5f5f5').rect(startX, currentY, currentX - startX, itemRowHeight).fill();
+            doc.fillColor('#f5f5f5').rect(contentX, currentY, contentWidth, rowHeight).fill();
+            doc.fillColor('#333333');
           }
 
-          doc.fillColor('black');
-          
           // Cantidad
-          doc.text(item.quantity.toString(), columnPositions[0].x + 2, currentY + 8, { 
-            width: columnPositions[0].width - 4, 
-            align: 'center' 
+          doc.text(item.quantity.toString(), colPositions[0].x + 3, currentY + 6, {
+            width: colPositions[0].width - 6,
+            align: 'center'
           });
-          
-          // Detalle (nombre del producto)
-          doc.text(item.productName, columnPositions[1].x + 3, currentY + 8, { 
-            width: columnPositions[1].width - 6, 
-            align: 'left' 
+
+          // Código
+          const productCode = (item as any).product?.code || '-';
+          doc.fontSize(7).text(productCode, colPositions[1].x + 2, currentY + 6, {
+            width: colPositions[1].width - 4,
+            align: 'left'
           });
-          
+          doc.fontSize(8);
+
+          // Detalle
+          const detailY = currentY + 6;
+          doc.text(item.productName, colPositions[2].x + 2, detailY, {
+            width: colPositions[2].width - 4,
+            align: 'left',
+            lineBreak: false
+          });
+
           // Marca
-          doc.text(item.brand || '', columnPositions[2].x + 2, currentY + 8, { 
-            width: columnPositions[2].width - 4, 
-            align: 'center' 
+          doc.fontSize(7).text(item.brand || '-', colPositions[3].x + 2, currentY + 6, {
+            width: colPositions[3].width - 4,
+            align: 'center'
           });
+          doc.fontSize(8);
 
           // Origen
-          doc.text(item.origin || '', columnPositions[3].x + 2, currentY + 8, { 
-            width: columnPositions[3].width - 4, 
-            align: 'center' 
+          doc.fontSize(7).text(item.origin || '-', colPositions[4].x + 2, currentY + 6, {
+            width: colPositions[4].width - 4,
+            align: 'center'
           });
-          
-          // Valor unitario sin IVA
+          doc.fontSize(8);
+
+          // V. UNIT (SIN IVA)
+          const priceUnit = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
+            ? (item.competitorInfo?.winnerPrice || 0)
+            : Number(item.priceWithoutIVA);
           doc.text(
-            `${Number(item.priceWithoutIVA).toFixed(2)}`,
-            columnPositions[4].x + 2,
-            currentY + 8,
-            { width: columnPositions[4].width - 4, align: 'right' }
+            `${priceUnit.toFixed(2)}`,
+            colPositions[5].x + 2,
+            currentY + 6,
+            { width: colPositions[5].width - 4, align: 'right' }
           );
-          
-          // Total IVA (monto)
-          const ivaPerUnit = Number(item.priceWithIVA) - Number(item.priceWithoutIVA);
-          const totalIva = ivaPerUnit * item.quantity;
+
+          // P.UNIT TOTAL
+          const priceUnitTotal = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
+            ? (item.competitorInfo?.winnerPrice || 0)
+            : Number(item.priceWithIVA);
           doc.text(
-            `${totalIva.toFixed(2)}`,
-            columnPositions[5].x + 2,
-            currentY + 8,
-            { width: columnPositions[5].width - 4, align: 'right' }
+            `${priceUnitTotal.toFixed(2)}`,
+            colPositions[6].x + 2,
+            currentY + 6,
+            { width: colPositions[6].width - 4, align: 'right' }
           );
-          
-          // Total linea (con IVA)
-          const total = Number(item.priceWithIVA) * item.quantity;
+
+          // TOTAL
+          const total = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
+            ? (item.competitorInfo?.winnerPrice || 0) * item.quantity
+            : Number(item.priceWithIVA) * item.quantity;
           doc.text(
             `${total.toFixed(2)}`,
-            columnPositions[6].x + 2,
-            currentY + 8,
-            { width: columnPositions[6].width - 4, align: 'right' }
+            colPositions[7].x + 2,
+            currentY + 6,
+            { width: colPositions[7].width - 4, align: 'right' }
           );
 
-          // Dibujar bordes de todas las celdas
-          columnPositions.forEach(col => {
-            doc.rect(col.x, currentY, col.width, itemRowHeight).stroke();
-          });
+          // Bordes
+          doc
+            .strokeColor('#e5e7eb')
+            .lineWidth(0.5)
+            .rect(contentX, currentY, contentWidth, rowHeight)
+            .stroke();
 
-          currentY += itemRowHeight;
+          currentY += rowHeight;
         });
 
-        // Agregar filas vacías si hay menos de 5 items
+        // Rellenar filas hasta mínimo 5
         const minRows = 5;
         const currentRows = quotation.items.length;
         if (currentRows < minRows) {
-            for (let i = currentRows; i < minRows; i++) {
-              if (i % 2 === 0) {
-                doc.fillColor('#f5f5f5').rect(startX, currentY, currentX - startX, itemRowHeight).fill();
-              }
-              
-              doc.fillColor('#999999'); // Texto gris suave para filas vacías
-              
-              // Cantidad
-              doc.text('-', columnPositions[0].x + 2, currentY + 8, { 
-                width: columnPositions[0].width - 4, 
-                align: 'center' 
-              });
-              
-              // Detalle
-              doc.text('', columnPositions[1].x + 3, currentY + 8, { 
-                width: columnPositions[1].width - 6, 
-                align: 'left' 
-              });
-              
-              // Ceros en columnas de precio
-              doc.text('0,00', columnPositions[4].x + 2, currentY + 8, { 
-                width: columnPositions[4].width - 4, 
-                align: 'right' 
-              });
-              doc.text('0,00', columnPositions[5].x + 2, currentY + 8, { 
-                width: columnPositions[5].width - 4, 
-                align: 'right' 
-              });
-              doc.text('0,00', columnPositions[6].x + 2, currentY + 8, { 
-                width: columnPositions[6].width - 4, 
-                align: 'right' 
-              });
-
-              columnPositions.forEach(col => {
-                doc.rect(col.x, currentY, col.width, itemRowHeight).stroke();
-              });
-
-              currentY += itemRowHeight;
+          for (let i = currentRows; i < minRows; i++) {
+            if (i % 2 === 0) {
+              doc.fillColor('#f5f5f5').rect(contentX, currentY, contentWidth, rowHeight).fill();
+              doc.fillColor('#333333');
             }
+
+            doc.fillColor('#cccccc');
+            doc.text('-', colPositions[0].x + 3, currentY + 6, {
+              width: colPositions[0].width - 6,
+              align: 'center'
+            });
+            doc.text('0,00', colPositions[4].x + 2, currentY + 6, {
+              width: colPositions[4].width - 4,
+              align: 'right'
+            });
+            doc.text('0,00', colPositions[5].x + 2, currentY + 6, {
+              width: colPositions[5].width - 4,
+              align: 'right'
+            });
+            doc.text('0,00', colPositions[6].x + 2, currentY + 6, {
+              width: colPositions[6].width - 4,
+              align: 'right'
+            });
+
+            doc.strokeColor('#e5e7eb').lineWidth(0.5).rect(contentX, currentY, contentWidth, rowHeight).stroke();
+            currentY += rowHeight;
+          }
         }
 
-        // Resumen de Totales
-        const summaryWidth = columnPositions[5].width + columnPositions[6].width;
-        const summaryX = columnPositions[5].x;
-        const summaryRowHeight = 20;
+        // Línea debajo de tabla
+        doc
+          .strokeColor('#4472C4')
+          .lineWidth(1)
+          .moveTo(contentX, currentY)
+          .lineTo(contentX + contentWidth, currentY)
+          .stroke();
 
-        const subtotal = quotation.items.reduce((acc, item) => acc + (Number(item.priceWithoutIVA) * item.quantity), 0);
-        const total = quotation.items.reduce((acc, item) => acc + (Number(item.priceWithIVA) * item.quantity), 0);
+        // === TOTALES (recuadro pequeño a la derecha) ===
+        const totalsY = currentY + 10;
+        const totalsBoxWidth = 200;
+        const totalsBoxX = contentX + contentWidth - totalsBoxWidth;
+
+        // Información a la izquierda del recuadro de totales
+        const infoLeftY = totalsY;
+        const infoLeftX = contentX;
+        const infoLeftWidth = totalsBoxX - contentX - 10;
+
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('Moneda Cotizada:', infoLeftX, infoLeftY);
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(quotation.items[0]?.currency || 'UYU', infoLeftX + 110, infoLeftY);
+
+        const pagoY = infoLeftY + 18;
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('Forma de Pago:', infoLeftX, pagoY);
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(quotation.paymentForm || '30 días', infoLeftX + 110, pagoY);
+
+        const validezY = pagoY + 18;
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('Validez:', infoLeftX, validezY);
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(quotation.validity || '15 días', infoLeftX + 110, validezY);
+
+        const subtotal = quotation.items.reduce((acc, item) => {
+          const price = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
+            ? (item.competitorInfo?.winnerPrice || 0)
+            : Number(item.priceWithoutIVA);
+          return acc + (price * item.quantity);
+        }, 0);
+
+        const total = quotation.items.reduce((acc, item) => {
+          const price = item.awardStatus === QuotationAwardStatus.NOT_AWARDED
+            ? (item.competitorInfo?.winnerPrice || 0)
+            : Number(item.priceWithIVA);
+          return acc + (price * item.quantity);
+        }, 0);
+
         const totalIva = total - subtotal;
 
-        currentY += 10;
-        doc.font('Helvetica-Bold').fontSize(8);
+        // Recuadro de totales pequeño a la derecha
+        const totalsBoxHeight = 85;
 
         // Subtotal
-        doc.text('SUBTOTAL:', columnPositions[4].x, currentY + 5, { width: columnPositions[4].width, align: 'right' });
-        doc.text(`${subtotal.toFixed(2)}`, columnPositions[6].x, currentY + 5, { width: columnPositions[6].width, align: 'right' });
-        currentY += summaryRowHeight;
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('Subtotal:', totalsBoxX + 5, totalsY + 10);
+
+        doc
+          .fontSize(10)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(`${subtotal.toFixed(2)}`, totalsBoxX + 110, totalsY + 10, {
+            width: 85,
+            align: 'right'
+          });
 
         // IVA
-        doc.text('TOTAL IVA:', columnPositions[4].x, currentY + 5, { width: columnPositions[4].width, align: 'right' });
-        doc.text(`${totalIva.toFixed(2)}`, columnPositions[6].x, currentY + 5, { width: columnPositions[6].width, align: 'right' });
-        currentY += summaryRowHeight;
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text('IVA (22%):', totalsBoxX + 5, totalsY + 32);
+
+        doc
+          .fontSize(10)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text(`${totalIva.toFixed(2)}`, totalsBoxX + 110, totalsY + 32, {
+            width: 85,
+            align: 'right'
+          });
 
         // Total
-        doc.fillColor('#4472C4').rect(columnPositions[4].x, currentY, columnPositions[6].x + columnPositions[6].width - columnPositions[4].x, summaryRowHeight).fill();
-        doc.fillColor('white');
-        doc.text('TOTAL:', columnPositions[4].x, currentY + 5, { width: columnPositions[4].width, align: 'right' });
-        doc.text(`${total.toFixed(2)} ${quotation.items[0]?.currency || ''}`, columnPositions[6].x, currentY + 5, { width: columnPositions[6].width, align: 'right' });
-        
-        doc.fillColor('black');
-        currentY += summaryRowHeight + 20;
-
-        doc.moveDown(1.5);
-        currentY = doc.y;
-
-        // Información adicional (Moneda, Forma de Pago, Validez, Observaciones)
-        const infoBoxY = currentY;
-        const leftInfoX = 60;
-        const leftInfoWidth = 200;
-        const obsX = 280;
-        const obsWidth = 275;
-        const infoRowHeight = 25;
-
-        doc.fontSize(9).font('Helvetica-Bold');
-
-        // Moneda Cotizada
         doc
           .fillColor('#4472C4')
-          .rect(leftInfoX, infoBoxY, 120, infoRowHeight)
-          .fill()
-          .fillColor('white')
-          .text('Moneda Cotizada', leftInfoX + 5, infoBoxY + 8, { width: 110 });
+          .rect(totalsBoxX, totalsY + 52, totalsBoxWidth, 28)
+          .fill();
 
         doc
-          .fillColor('black')
-          .rect(leftInfoX + 120, infoBoxY, leftInfoWidth - 120, infoRowHeight)
-          .stroke()
-          .font('Helvetica')
-          .text(quotation.items[0]?.currency || 'USD', leftInfoX + 125, infoBoxY + 8, { 
-            width: leftInfoWidth - 130 
-          });
-
-        // Forma de Pago
-        const formaPagoY = infoBoxY + infoRowHeight;
-        doc
+          .fontSize(10)
           .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(leftInfoX, formaPagoY, 120, infoRowHeight)
-          .fill()
           .fillColor('white')
-          .text('Forma de Pago', leftInfoX + 5, formaPagoY + 8, { width: 110 });
+          .text('TOTAL:', totalsBoxX + 10, totalsY + 60);
 
         doc
-          .fillColor('black')
-          .rect(leftInfoX + 120, formaPagoY, leftInfoWidth - 120, infoRowHeight)
-          .stroke()
-          .font('Helvetica')
-          .text(quotation.paymentForm || '30 días', leftInfoX + 125, formaPagoY + 8, { 
-            width: leftInfoWidth - 130 
-          });
-
-        // Validez
-        const validezY = formaPagoY + infoRowHeight;
-        doc
+          .fontSize(14)
           .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(leftInfoX, validezY, 120, infoRowHeight)
-          .fill()
           .fillColor('white')
-          .text('VALIDEZ', leftInfoX + 5, validezY + 8, { width: 110 });
-
-        doc
-          .fillColor('black')
-          .rect(leftInfoX + 120, validezY, leftInfoWidth - 120, infoRowHeight)
-          .stroke()
-          .font('Helvetica')
-          .text(quotation.validity || '30 días', leftInfoX + 125, validezY + 8, { 
-            width: leftInfoWidth - 130 
+          .text(`${total.toFixed(2)} ${quotation.items[0]?.currency || ''}`, totalsBoxX + 110, totalsY + 60, {
+            width: 85,
+            align: 'right'
           });
 
-        // Observaciones (cuadro grande a la derecha)
-        const obsHeight = infoRowHeight * 3;
-        doc
-          .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .rect(obsX, infoBoxY, obsWidth, infoRowHeight)
-          .fill()
-          .fillColor('white')
-          .text('OBSERVACIONES', obsX + 5, infoBoxY + 8, { 
-            width: obsWidth - 10, 
-            align: 'center' 
-          });
+        // === OBSERVACIONES ===
+        const obsY = totalsY + 95;
+        const obsBoxWidth = contentWidth;
+        const obsBoxHeight = 45;
 
         doc
-          .fillColor('black')
-          .rect(obsX, infoBoxY + infoRowHeight, obsWidth, obsHeight - infoRowHeight)
-          .stroke()
-          .font('Helvetica')
           .fontSize(8)
-          .text(quotation.observations || '', obsX + 5, infoBoxY + infoRowHeight + 5, { 
-            width: obsWidth - 10, 
-            align: 'left'
+          .font('Helvetica-Bold')
+          .fillColor('#666666')
+          .text('OBSERVACIONES:', contentX, obsY + 5);
+
+        doc
+          .fillColor('white')
+          .rect(contentX, obsY + 15, obsBoxWidth, obsBoxHeight)
+          .stroke();
+
+        doc
+          .fontSize(8)
+          .font('Helvetica')
+          .fillColor('#333333')
+          .text(quotation.observations || '', contentX + 5, obsY + 20, {
+            width: obsBoxWidth - 10
           });
+
+        // === FIRMA ===
+        const footerY = obsY + obsBoxHeight + 10;
+
+        // Línea decorativa
+        doc
+          .strokeColor('#e0e0e0')
+          .lineWidth(1)
+          .moveTo(contentX, footerY)
+          .lineTo(contentX + contentWidth, footerY)
+          .stroke();
+
+        doc
+          .fontSize(11)
+          .font('Helvetica-Bold')
+          .fillColor('#333333')
+          .text('Firma: Nicolas Cornalino', centerX, footerY + 20, { align: 'center' });
+
+        // === FOOTER ===
+        const footerBottomY = footerY + 50;
+        doc
+          .fontSize(7)
+          .font('Helvetica')
+          .fillColor('#999999')
+          .text('Este documento no tiene validez como factura', centerX, footerBottomY, { align: 'center' });
 
         // Finalizar PDF
         doc.end();

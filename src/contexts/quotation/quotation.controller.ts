@@ -25,6 +25,7 @@ import { QuotationService } from './quotation.service';
 import { QuotationPdfService } from './quotation-pdf.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
+import { UpdateItemAwardStatusDto } from './dto/update-item-award-status.dto';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
@@ -68,6 +69,12 @@ export class QuotationController {
     required: false,
     description: "Filtrar por ID de cliente",
   })
+  @ApiQuery({
+    name: "closedOnly",
+    required: false,
+    description: "Mostrar solo cotizaciones de licitaciones cerradas",
+    type: Boolean,
+  })
   @ApiResponse({
     status: 200,
     description: "Lista de cotizaciones obtenida exitosamente",
@@ -79,7 +86,14 @@ export class QuotationController {
     @Query("clientId") clientId?: string,
     @Query("productId") productId?: string,
   ) {
-    return this.quotationService.findAll(paginationDto, search, status, clientId ? +clientId : undefined, productId ? +productId : undefined);
+    return this.quotationService.findAll(
+      paginationDto,
+      search,
+      status,
+      clientId ? +clientId : undefined,
+      productId ? +productId : undefined,
+      paginationDto.closedOnly,
+    );
   }
 
   @Get("by-client/:clientId")
@@ -181,6 +195,32 @@ export class QuotationController {
     return this.quotationService.getTotalsByQuotation(+id);
   }
 
+  // Rutas específicas DEBEN ir antes que las genéricas
+  @Patch(":id/item/:itemId/award-status")
+  @ApiOperation({ summary: "Actualizar estado de adjudicación de un item de cotización" })
+  @ApiParam({ name: "id", description: "ID de la cotización" })
+  @ApiParam({ name: "itemId", description: "ID del item de la cotización" })
+  @ApiResponse({
+    status: 200,
+    description: "Estado de adjudicación actualizado exitosamente",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Cotización o item no encontrado",
+  })
+  async updateItemAwardStatus(
+    @Param("id") id: string,
+    @Param("itemId") itemId: string,
+    @Body() updateItemAwardStatusDto: UpdateItemAwardStatusDto,
+  ) {
+    return this.quotationService.updateItemAwardStatus(
+      +id,
+      +itemId,
+      updateItemAwardStatusDto.awardStatus,
+      updateItemAwardStatusDto.awardedQuantity,
+    );
+  }
+
   @Patch(":id")
   @ApiOperation({ summary: "Actualizar cotización" })
   @ApiParam({ name: "id", description: "ID de la cotización" })
@@ -224,14 +264,6 @@ export class QuotationController {
   @ApiResponse({
     status: 200,
     description: "Preview del PDF generado exitosamente (base64)",
-    schema: {
-      type: "object",
-      properties: {
-        pdfBase64: { type: "string" },
-        quotationId: { type: "number" },
-        quotationIdentifier: { type: "string" },
-      },
-    },
   })
   @ApiResponse({
     status: 404,
@@ -240,7 +272,7 @@ export class QuotationController {
   async getPdfPreview(@Param("id") id: string) {
     const quotation = await this.quotationService.findOne(+id);
     const pdfBase64 = await this.quotationPdfService.generatePdfBase64(quotation);
-    
+
     return {
       pdfBase64,
       quotationId: quotation.id,
@@ -254,6 +286,16 @@ export class QuotationController {
   @ApiResponse({
     status: 200,
     description: "PDF descargado exitosamente",
+  })
+  @ApiResponse({
+    status: 404,
+    description: "Cotización no encontrada",
+  })
+  @ApiResponse({
+    status: 500,
+    description: "Error al generar el PDF",
+  })
+  @ApiResponse({
     content: {
       "application/pdf": {
         schema: {
@@ -263,22 +305,18 @@ export class QuotationController {
       },
     },
   })
-  @ApiResponse({
-    status: 404,
-    description: "Cotización no encontrada",
-  })
   async downloadPdf(
     @Param("id") id: string,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     const quotation = await this.quotationService.findOne(+id);
     const pdfBuffer = await this.quotationPdfService.generatePdf(quotation);
-    
+
     const filename = `cotizacion_${quotation.quotationIdentifier}_${new Date().toISOString().split('T')[0]}.pdf`;
-    
+
     reply.header("Content-Type", "application/pdf");
     reply.header("Content-Disposition", `attachment; filename="${filename}"`);
-    
+
     reply.send(pdfBuffer);
   }
 }

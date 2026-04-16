@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsNumber, IsOptional, Min, IsArray, IsUrl, IsInt } from 'class-validator';
+import type { QuotationHistoryEntry, AdjudicationHistoryEntry } from '../../shared/types/product-history.types';
 
 export class CreateProductDto {
 
@@ -78,12 +79,12 @@ export class CreateProductDto {
   @ApiProperty({ description: 'Previous quotes history', example: [], required: false })
   @IsArray()
   @IsOptional()
-  quotationHistory?: any[];
+  quotationHistory?: QuotationHistoryEntry[];
 
   @ApiProperty({ description: 'Previous adjudications history', example: [], required: false })
   @IsArray()
   @IsOptional()
-  adjudicationHistory?: any[];
+  adjudicationHistory?: AdjudicationHistoryEntry[];
 
   // Legacy fields for backward compatibility
   @ApiProperty({ description: 'Product description', example: 'High-performance laptop', required: false })

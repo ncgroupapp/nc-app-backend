@@ -66,7 +66,7 @@ export class QuotationService {
           productName = product.name;
         }
         if (!productName) {
-          throw new NotFoundException('Se requiere productName o un productId válido');
+          throw new NotFoundException(ERROR_MESSAGES.QUOTATION.PRODUCT_OR_NAME_REQUIRED);
         }
         return this.quotationItemRepository.create({
           ...item,
@@ -78,14 +78,27 @@ export class QuotationService {
     return await this.quotationRepository.save(quotation);
   }
 
-  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number, productId?: number): Promise<PaginatedResult<Quotation>> {
+  async findAll(paginationDto: PaginationDto, search?: string, status?: string, clientId?: number, productId?: number, closedOnly?: boolean): Promise<PaginatedResult<Quotation>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const queryBuilder = this.quotationRepository.createQueryBuilder('quotation')
       .leftJoinAndSelect('quotation.items', 'items')
+      .leftJoin('quotation.licitation', 'licitation')
       .orderBy('quotation.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
+
+    // Filter based on closedOnly parameter
+    if (closedOnly === true) {
+      // Only quotations from closed licitations
+      queryBuilder.andWhere('licitation.status = :closedStatus', { closedStatus: LicitationStatus.CLOSED });
+    } else {
+      // By default, exclude quotations from closed licitations
+      queryBuilder.andWhere(
+        '(quotation.licitationId IS NULL OR licitation.status != :closedStatus)',
+        { closedStatus: LicitationStatus.CLOSED }
+      );
+    }
 
     if (search) {
       queryBuilder.andWhere(
@@ -121,7 +134,7 @@ export class QuotationService {
   async findOne(id: number): Promise<Quotation> {
     const quotation = await this.quotationRepository.findOne({
       where: { id },
-      relations: ['items'],
+      relations: ['items', 'items.product'],
     });
 
     if (!quotation) {
@@ -190,7 +203,7 @@ export class QuotationService {
         }
 
         if (!productName) {
-          throw new NotFoundException('Se requiere productName o un productId válido');
+          throw new NotFoundException(ERROR_MESSAGES.QUOTATION.PRODUCT_OR_NAME_REQUIRED);
         }
 
         // Recalcular awardStatus si el item tiene awardedQuantity
@@ -364,5 +377,65 @@ export class QuotationService {
       totalItems: quotation.items.length,
       itemsByCurrency,
     };
+  }
+
+  async updateItemAwardStatus(
+    quotationId: number,
+    itemId: number,
+    awardStatus: QuotationAwardStatus,
+    awardedQuantity?: number,
+  ): Promise<void> {
+    // Verificar que la cotización existe
+    const quotation = await this.findOne(quotationId);
+
+    // Buscar el item
+    const item = quotation.items.find((i) => i.id === itemId);
+    if (!item) {
+      throw new NotFoundException(ERROR_MESSAGES.QUOTATION.ITEM_NOT_FOUND(itemId));
+    }
+
+    // Si es PENDING, limpiar awardedQuantity
+    if (awardStatus === QuotationAwardStatus.PENDING) {
+      item.awardStatus = awardStatus;
+      item.awardedQuantity = undefined;
+    }
+    // Si es PARTIALLY_AWARDED, usar la cantidad proporcionada
+    else if (awardStatus === QuotationAwardStatus.PARTIALLY_AWARDED) {
+      item.awardStatus = awardStatus;
+      item.awardedQuantity = awardedQuantity || item.quantity;
+    }
+    // Para AWARDED o NOT_AWARDED, simplemente actualizar el estado
+    else {
+      item.awardStatus = awardStatus;
+      // Para AWARDED, la cantidad adjudicada es la total
+      if (awardStatus === QuotationAwardStatus.AWARDED) {
+        item.awardedQuantity = item.quantity;
+      }
+    }
+
+    await this.quotationItemRepository.save(item);
+
+    // Sincronizar con el sistema de adjudicaciones y entregas
+    if (awardStatus === QuotationAwardStatus.AWARDED || awardStatus === QuotationAwardStatus.PARTIALLY_AWARDED) {
+      // Si pasa a adjudicado (total o parcial), creamos/actualizamos la adjudicación
+      if (item.productId && item.awardedQuantity && item.awardedQuantity > 0 && quotation.licitationId) {
+        await this.adjudicationsService.create({
+          licitationId: quotation.licitationId,
+          quotationId: quotation.id,
+          status: awardStatus === QuotationAwardStatus.AWARDED ? AdjudicationStatus.TOTAL : AdjudicationStatus.PARTIAL,
+          items: [{
+            productId: item.productId,
+            quantity: item.awardedQuantity,
+            unitPrice: item.priceWithoutIVA,
+            productName: item.productName || '',
+          }],
+        });
+      }
+    } else if (awardStatus === QuotationAwardStatus.PENDING || awardStatus === QuotationAwardStatus.NOT_AWARDED) {
+      // Si pasa a PENDING o NOT_AWARDED, se elimina de adjudicaciones y entregas
+      if (item.productId) {
+        await this.adjudicationsService.removeProductFromAdjudication(quotationId, item.productId);
+      }
+    }
   }
 }

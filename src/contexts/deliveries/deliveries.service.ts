@@ -21,6 +21,7 @@ export interface UpdateDeliveryItemDto {
   actualDate?: Date;
   observations?: string;
   quantity?: number;
+  estimatedDate?: Date;
 }
 
 export interface CreateInvoiceDto {
@@ -73,14 +74,32 @@ export class DeliveriesService {
     const estimatedDate = new Date();
     estimatedDate.setDate(estimatedDate.getDate() + 7);
 
+    // Obtener los items actuales de entrega para esta adjudicación específica
+    const currentDeliveryItems = await this.deliveryItemRepository.find({
+      where: { deliveryId: delivery.id, adjudicationId: adjudication.id }
+    });
+
+    // Productos que están adjudicados actualmente
+    const awardedProductIds = (adjudication.items || []).map(item => item.productId).filter(id => !!id) as number[];
+
+    // ELIMINAR items de entrega que ya no están en la adjudicación
+    for (const item of currentDeliveryItems) {
+      if (!item.productId || !awardedProductIds.includes(item.productId)) {
+        await this.deliveryItemRepository.remove(item);
+      }
+    }
+
     // Crear o actualizar DeliveryItems para cada AdjudicationItem
     if (adjudication.items && adjudication.items.length > 0) {
       for (const adjItem of adjudication.items) {
-        // Buscar si ya existe un DeliveryItem para este producto
+        if (!adjItem.productId) continue;
+
+        // Buscar si ya existe un DeliveryItem para este producto Y esta adjudicación
         const existingItem = await this.deliveryItemRepository.findOne({
           where: { 
             deliveryId: delivery.id, 
-            productId: adjItem.productId 
+            productId: adjItem.productId,
+            adjudicationId: adjudication.id
           }
         });
 
@@ -92,6 +111,7 @@ export class DeliveriesService {
           // Si no existe, crear nuevo
           const deliveryItem = this.deliveryItemRepository.create({
             deliveryId: delivery.id,
+            adjudicationId: adjudication.id,
             productId: adjItem.productId,
             productCode: adjItem.productName || `PROD-${adjItem.productId}`,
             productName: adjItem.productName || 'Producto',

@@ -6,9 +6,10 @@ import { Licitation } from "./entities/licitation.entity";
 import { LicitationProduct } from "./entities/licitation-product.entity";
 import { Client } from "@/contexts/clients/entities/client.entity";
 import { Product } from "@/contexts/products/entities/product.entity";
+import { Quotation } from "@/contexts/quotation/entities/quotation.entity";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Licitation, LicitationProduct, Client, Product])],
+  imports: [TypeOrmModule.forFeature([Licitation, LicitationProduct, Client, Product, Quotation])],
   controllers: [LicitationsController],
   providers: [LicitationsService],
   exports: [LicitationsService],
