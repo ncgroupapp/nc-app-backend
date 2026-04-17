@@ -16,7 +16,7 @@ export class QuotationPdfService {
       try {
         const doc = new PDFDocument({
           size: 'A4',
-          margins: { top: 35, bottom: 50, left: 35, right: 35 },
+          margins: { top: 25, bottom: 25, left: 35, right: 35 },
           info: {
             Title: `Cotización ${quotation.quotationIdentifier}`,
             Author: 'Nicolas Cornalino',
@@ -58,23 +58,24 @@ export class QuotationPdfService {
           }
 
           if (logoBuffer) {
-            doc.image(logoBuffer, contentX, headerY, { width: 65 });
+            doc.image(logoBuffer, contentX, headerY, { width: 60 });
           }
         } catch (logoError) {
           // Continuar sin logo si no se encuentra
         }
 
-        // Título y número centrados
+        // Info de la empresa arriba a la derecha
         doc
-          .fontSize(18)
+          .fontSize(10)
           .font('Helvetica-Bold')
-          .fillColor('#4472C4')
-          .text('COTIZACIÓN', centerX, headerY + 8, { align: 'center' });
+          .fillColor('#333333')
+          .text('NC GROUP SAS', contentX, headerY + 5, { align: 'right' });
 
         doc
-          .fontSize(11)
+          .fontSize(9)
+          .font('Helvetica')
           .fillColor('#666666')
-          .text(quotation.quotationIdentifier, centerX, headerY + 30, { align: 'center' });
+          .text('RUT. 190323070010', contentX, headerY + 18, { align: 'right' });
 
         // Línea decorativa
         doc
@@ -85,7 +86,7 @@ export class QuotationPdfService {
           .stroke();
 
         // === INFO CLIENTE ===
-        const infoY = headerY + 55;
+        const infoY = headerY + 50;
 
         doc
           .fontSize(8)
@@ -100,7 +101,7 @@ export class QuotationPdfService {
           .text(quotation.clientName || 'N/A', contentX + 45, infoY, { width: 250 });
 
         // === INFO FECHA ===
-        const dateInfoY = infoY + 22;
+        const dateInfoY = infoY + 18;
         const quoteDate = quotation.quotationDate || quotation.createdAt;
         const dateStr = quoteDate
           ? new Date(quoteDate).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Montevideo' })
@@ -123,20 +124,20 @@ export class QuotationPdfService {
           .fillColor('#333333')
           .text(dateStr, contentX + 45, dateInfoY, { width: 150 });
 
-        // === IMM, APERT, HORA ===
-        const immInfoY = dateInfoY + 22;
+        // === COTIZACIÓN, APERT, HORA ===
+        const immInfoY = dateInfoY + 18;
 
         doc
           .fontSize(8)
           .font('Helvetica')
           .fillColor('#666666')
-          .text('IMM:', contentX, immInfoY);
+          .text('COTIZACIÓN:', contentX, immInfoY);
 
         doc
           .fontSize(11)
           .font('Helvetica-Bold')
           .fillColor('#333333')
-          .text(quotation.clientName || 'N/A', contentX + 45, immInfoY, { width: 200 });
+          .text(quotation.quotationIdentifier, contentX + 70, immInfoY, { width: 180 });
 
         doc
           .fontSize(8)
@@ -169,14 +170,14 @@ export class QuotationPdfService {
 
         // Línea decorativa
         doc
-          .moveTo(contentX, immInfoY + 22)
-          .lineTo(contentX + contentWidth, immInfoY + 22)
+          .moveTo(contentX, immInfoY + 18)
+          .lineTo(contentX + contentWidth, immInfoY + 18)
           .strokeColor('#e0e0e0')
           .lineWidth(1)
           .stroke();
 
         // === TABLA DE ITEMS ===
-        const tableY = immInfoY + 32;
+        const tableY = immInfoY + 25;
         const rowHeight = 20;
 
         // Columnas: CANT. | CÓDIGO | DETALLE / ARTÍCULO | MARCA | ORIGEN | V. UNIT (SIN IVA) | P.UNIT TOTAL | TOTAL
@@ -500,7 +501,7 @@ export class QuotationPdfService {
           });
 
         // === FIRMA ===
-        const footerY = obsY + obsBoxHeight + 10;
+        const footerY = obsY + obsBoxHeight + 8; // Bajamos de 10 a 8
 
         // Línea decorativa
         doc
@@ -530,14 +531,14 @@ export class QuotationPdfService {
           }
 
           if (signatureBuffer) {
-            const signatureWidth = 100;
-            doc.image(signatureBuffer, signatureBoxX + (signatureBoxWidth - signatureWidth) / 2, footerY + 10, { width: signatureWidth });
+            const signatureWidth = 90; // Achicamos un pelín la firma (era 100)
+            doc.image(signatureBuffer, signatureBoxX + (signatureBoxWidth - signatureWidth) / 2, footerY + 8, { width: signatureWidth });
             
             doc
               .fontSize(10)
               .font('Helvetica')
               .fillColor('#666666')
-              .text('Firma Autorizada', signatureBoxX, footerY + 110, { width: signatureBoxWidth, align: 'center' });
+              .text('Firma Autorizada', signatureBoxX, footerY + 95, { width: signatureBoxWidth, align: 'center' }); // Bajamos de 110 a 95
           } else {
             throw new Error('Signature image not found');
           }
@@ -550,7 +551,20 @@ export class QuotationPdfService {
         }
 
         // === FOOTER ===
-        // Eliminar aclaración de validez como factura por pedido del usuario
+        const contactInfoY = doc.page.height - 35; 
+        
+        doc
+          .fontSize(6) // Achicamos la letra para que entre en una línea
+          .font('Helvetica')
+          .fillColor('#666666')
+          .text(
+            'CALLE 1 M2 S22 PINAMAR-CANELONES, URUGUAY   |   TEL. 095604331 - 091960280   |   E-MAILS: ncgroup@ncgroup.com.uy - ncgroup.importaciones@ncgroup.com.uy',
+            contentX,
+            contactInfoY,
+            { align: 'center', width: contentWidth }
+          );
+
+        // Finalizar PDF
 
         // Finalizar PDF
         doc.end();
