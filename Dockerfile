@@ -21,6 +21,7 @@ COPY tsconfig*.json .
 COPY .swcrc .
 COPY nest-cli.json .
 COPY src src
+COPY assets assets
 
 EXPOSE $PORT
 CMD ["node", "--run", "dev"]
@@ -40,6 +41,7 @@ COPY tsconfig*.json .
 COPY .swcrc .
 COPY nest-cli.json .
 COPY src src
+COPY assets assets
 
 RUN node --run build && \
     pnpm prune --prod
@@ -54,6 +56,7 @@ COPY --from=build $DIR/package.json .
 COPY --from=build $DIR/pnpm-lock.yaml .
 COPY --from=build $DIR/node_modules node_modules
 COPY --from=build $DIR/dist dist
+COPY --from=build $DIR/assets assets
 
 USER $USER
 EXPOSE $PORT

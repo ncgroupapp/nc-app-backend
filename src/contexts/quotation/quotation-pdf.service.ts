@@ -43,9 +43,23 @@ export class QuotationPdfService {
 
         // Logo
         try {
-          const logoPath = join(process.cwd(), 'assets', 'logo.png');
-          const logoBuffer = readFileSync(logoPath);
-          doc.image(logoBuffer, contentX, headerY, { width: 65 });
+          const possibleLogoPaths = [
+            join(process.cwd(), 'assets', 'logo.png'),
+            join(__dirname, '..', '..', '..', 'assets', 'logo.png'),
+            join(process.cwd(), 'dist', 'assets', 'logo.png'),
+          ];
+          
+          let logoBuffer: Buffer | null = null;
+          for (const path of possibleLogoPaths) {
+            try {
+              logoBuffer = readFileSync(path);
+              if (logoBuffer) break;
+            } catch (e) { continue; }
+          }
+
+          if (logoBuffer) {
+            doc.image(logoBuffer, contentX, headerY, { width: 65 });
+          }
         } catch (logoError) {
           // Continuar sin logo si no se encuentra
         }
@@ -501,16 +515,32 @@ export class QuotationPdfService {
         const signatureBoxX = contentX + contentWidth - signatureBoxWidth;
 
         try {
-          const signaturePath = join(process.cwd(), 'assets', 'firma.png');
-          const signatureBuffer = readFileSync(signaturePath);
-          const signatureWidth = 100;
-          doc.image(signatureBuffer, signatureBoxX + (signatureBoxWidth - signatureWidth) / 2, footerY + 10, { width: signatureWidth });
-          
-          doc
-            .fontSize(10)
-            .font('Helvetica')
-            .fillColor('#666666')
-            .text('Firma Autorizada', signatureBoxX, footerY + 110, { width: signatureBoxWidth, align: 'center' });
+          const possibleSignaturePaths = [
+            join(process.cwd(), 'assets', 'firma.png'),
+            join(__dirname, '..', '..', '..', 'assets', 'firma.png'),
+            join(process.cwd(), 'dist', 'assets', 'firma.png'),
+          ];
+
+          let signatureBuffer: Buffer | null = null;
+          for (const path of possibleSignaturePaths) {
+            try {
+              signatureBuffer = readFileSync(path);
+              if (signatureBuffer) break;
+            } catch (e) { continue; }
+          }
+
+          if (signatureBuffer) {
+            const signatureWidth = 100;
+            doc.image(signatureBuffer, signatureBoxX + (signatureBoxWidth - signatureWidth) / 2, footerY + 10, { width: signatureWidth });
+            
+            doc
+              .fontSize(10)
+              .font('Helvetica')
+              .fillColor('#666666')
+              .text('Firma Autorizada', signatureBoxX, footerY + 110, { width: signatureBoxWidth, align: 'center' });
+          } else {
+            throw new Error('Signature image not found');
+          }
         } catch (error) {
           doc
             .fontSize(11)
