@@ -9,6 +9,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Licitation } from '@/contexts/licitations/entities/licitation.entity';
+import { Product } from '../../products/entities/product.entity';
 
 // Enums para los estados
 export enum QuotationAwardStatus {
@@ -172,6 +173,10 @@ export class QuotationItem {
   })
   @JoinColumn({ name: 'quotationId' })
   quotation!: Quotation;
+
+  @ManyToOne(() => Product, { nullable: true, createForeignKeyConstraints: false })
+  @JoinColumn({ name: 'productId' })
+  product?: Product;
 
   @CreateDateColumn()
   createdAt!: Date;
