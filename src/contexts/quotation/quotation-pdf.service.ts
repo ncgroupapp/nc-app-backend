@@ -496,19 +496,31 @@ export class QuotationPdfService {
           .lineTo(contentX + contentWidth, footerY)
           .stroke();
 
-        doc
-          .fontSize(11)
-          .font('Helvetica-Bold')
-          .fillColor('#333333')
-          .text('Firma: Nicolas Cornalino', centerX, footerY + 20, { align: 'center' });
+        // Firma
+        const signatureBoxWidth = 200;
+        const signatureBoxX = contentX + contentWidth - signatureBoxWidth;
+
+        try {
+          const signaturePath = join(process.cwd(), 'assets', 'firma.png');
+          const signatureBuffer = readFileSync(signaturePath);
+          const signatureWidth = 100;
+          doc.image(signatureBuffer, signatureBoxX + (signatureBoxWidth - signatureWidth) / 2, footerY + 10, { width: signatureWidth });
+          
+          doc
+            .fontSize(10)
+            .font('Helvetica')
+            .fillColor('#666666')
+            .text('Firma Autorizada', signatureBoxX, footerY + 110, { width: signatureBoxWidth, align: 'center' });
+        } catch (error) {
+          doc
+            .fontSize(11)
+            .font('Helvetica-Bold')
+            .fillColor('#333333')
+            .text('Firma: Nicolas Cornalino', signatureBoxX, footerY + 40, { width: signatureBoxWidth, align: 'center' });
+        }
 
         // === FOOTER ===
-        const footerBottomY = footerY + 50;
-        doc
-          .fontSize(7)
-          .font('Helvetica')
-          .fillColor('#999999')
-          .text('Este documento no tiene validez como factura', centerX, footerBottomY, { align: 'center' });
+        // Eliminar aclaración de validez como factura por pedido del usuario
 
         // Finalizar PDF
         doc.end();
