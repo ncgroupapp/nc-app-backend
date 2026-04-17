@@ -89,12 +89,12 @@ export class QuotationPdfService {
         const dateInfoY = infoY + 22;
         const quoteDate = quotation.quotationDate || quotation.createdAt;
         const dateStr = quoteDate
-          ? new Date(quoteDate).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
-          : new Date().toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          ? new Date(quoteDate).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Montevideo' })
+          : new Date().toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Montevideo' });
 
         // Formato 24h para la hora (sin p.m./a.m.)
         const timeStr = quoteDate
-          ? new Date(quoteDate).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false })
+          ? new Date(quoteDate).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Montevideo' })
           : '';
 
         doc
@@ -132,7 +132,7 @@ export class QuotationPdfService {
 
         // APERT usa validUntil (fecha de validez)
         const validUntilStr = quotation.validUntil
-          ? new Date(quotation.validUntil).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          ? new Date(quotation.validUntil).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Montevideo' })
           : '-';
 
         doc
@@ -207,9 +207,17 @@ export class QuotationPdfService {
         doc.font('Helvetica').fontSize(8).fillColor('#333333');
 
         quotation.items.forEach((item, index) => {
+          // Calcular altura dinámica de la fila basada en el detalle del producto
+          const detailWidth = colPositions[2].width - 4;
+          const textHeight = doc.heightOfString(item.productName, {
+            width: detailWidth,
+            align: 'left'
+          });
+          const dynamicRowHeight = Math.max(20, textHeight + 12); // 6px padding arriba/abajo
+
           // Fondo alternado
           if (index % 2 === 0) {
-            doc.fillColor('#f5f5f5').rect(contentX, currentY, contentWidth, rowHeight).fill();
+            doc.fillColor('#f5f5f5').rect(contentX, currentY, contentWidth, dynamicRowHeight).fill();
             doc.fillColor('#333333');
           }
 
@@ -227,12 +235,12 @@ export class QuotationPdfService {
           });
           doc.fontSize(8);
 
-          // Detalle
+          // Detalle (con lineBreak: true para nombres largos)
           const detailY = currentY + 6;
           doc.text(item.productName, colPositions[2].x + 2, detailY, {
             width: colPositions[2].width - 4,
             align: 'left',
-            lineBreak: false
+            lineBreak: true
           });
 
           // Marca
@@ -286,10 +294,10 @@ export class QuotationPdfService {
           doc
             .strokeColor('#e5e7eb')
             .lineWidth(0.5)
-            .rect(contentX, currentY, contentWidth, rowHeight)
+            .rect(contentX, currentY, contentWidth, dynamicRowHeight)
             .stroke();
 
-          currentY += rowHeight;
+          currentY += dynamicRowHeight;
         });
 
         // Rellenar filas hasta mínimo 5
