@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsString,
   IsNotEmpty,
@@ -7,9 +7,11 @@ import {
   IsPositive,
   IsDateString,
   IsOptional,
+  IsEnum,
   Min,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { Currency } from "@/contexts/shared/enums/currency.enum";
 
 export class CreateOfferDto {
   @ApiProperty({
@@ -49,6 +51,15 @@ export class CreateOfferDto {
   @IsPositive()
   @Type(() => Number)
   price!: number;
+
+  @ApiPropertyOptional({
+    description: "Offer currency",
+    enum: Currency,
+    default: Currency.CLP,
+  })
+  @IsEnum(Currency)
+  @IsOptional()
+  currency?: Currency;
 
   @ApiProperty({
     description: "Offer IVA amount",

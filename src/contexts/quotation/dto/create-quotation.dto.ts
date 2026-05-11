@@ -16,8 +16,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   QuotationStatus,
   QuotationAwardStatus,
-  Currency,
 } from '../entities/quotation.entity';
+import { Currency } from '@/contexts/shared/enums/currency.enum';
 
 export class CreateQuotationItemDto {
   @ApiPropertyOptional({ description: 'ID del producto (opcional, para referencia)' })

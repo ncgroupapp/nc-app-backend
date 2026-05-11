@@ -9,6 +9,7 @@ import {
 } from "typeorm";
 import { Product } from "@/contexts/products/entities/product.entity";
 import { Provider } from "@/contexts/providers/entities/provider.entity";
+import { Currency } from "@/contexts/shared/enums/currency.enum";
 
 @Entity("offers")
 export class Offer {
@@ -20,6 +21,13 @@ export class Offer {
 
   @Column({ type: "decimal", precision: 10, scale: 2 })
   price!: number;
+
+  @Column({
+    type: "enum",
+    enum: Currency,
+    default: Currency.CLP,
+  })
+  currency!: Currency;
 
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   iva!: number;

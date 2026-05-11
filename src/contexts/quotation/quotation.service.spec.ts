@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuotationService } from './quotation.service';
-import { Quotation, QuotationItem, QuotationStatus, QuotationAwardStatus, Currency } from './entities/quotation.entity';
+import { Quotation, QuotationItem, QuotationStatus, QuotationAwardStatus } from './entities/quotation.entity';
+import { Currency } from '@/contexts/shared/enums/currency.enum';
 import { NotFoundException, ConflictException } from '@nestjs/common';
 
 describe('QuotationService', () => {
