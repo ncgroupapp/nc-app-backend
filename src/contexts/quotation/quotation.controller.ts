@@ -270,7 +270,7 @@ export class QuotationController {
     description: "Cotización no encontrada",
   })
   async getPdfPreview(@Param("id") id: string) {
-    const quotation = await this.quotationService.findOne(+id);
+    const quotation = await this.quotationService.findOneForPdf(+id);
     const pdfBase64 = await this.quotationPdfService.generatePdfBase64(quotation);
 
     return {
@@ -309,7 +309,7 @@ export class QuotationController {
     @Param("id") id: string,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const quotation = await this.quotationService.findOne(+id);
+    const quotation = await this.quotationService.findOneForPdf(+id);
     const pdfBuffer = await this.quotationPdfService.generatePdf(quotation);
 
     const filename = `cotizacion_${quotation.quotationIdentifier}_${new Date().toISOString().split('T')[0]}.pdf`;

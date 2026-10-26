@@ -144,6 +144,23 @@ export class QuotationService {
     return quotation;
   }
 
+  /**
+   * Igual que findOne pero incluye la licitación y su cliente,
+   * que el PDF usa para el número de compra, la apertura, el RUT y la dirección.
+   */
+  async findOneForPdf(id: number): Promise<Quotation> {
+    const quotation = await this.quotationRepository.findOne({
+      where: { id },
+      relations: ['items', 'items.product', 'licitation', 'licitation.client'],
+    });
+
+    if (!quotation) {
+      throw new NotFoundException(ERROR_MESSAGES.QUOTATION.NOT_FOUND(id));
+    }
+
+    return quotation;
+  }
+
   async findByIdentifier(identifier: string): Promise<Quotation> {
     const quotation = await this.quotationRepository.findOne({
       where: { quotationIdentifier: identifier },
