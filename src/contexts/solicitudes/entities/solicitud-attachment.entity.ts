@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Relation } from "typeorm";
 import { SolicitudMessage } from "./solicitud-message.entity";
 
 /**
@@ -13,7 +13,7 @@ export class SolicitudAttachment {
 
   @ManyToOne(() => SolicitudMessage, (message) => message.attachments, { onDelete: "CASCADE" })
   @JoinColumn({ name: "messageId" })
-  message?: SolicitudMessage;
+  message?: Relation<SolicitudMessage>;
 
   @Column({ type: "int" })
   messageId!: number;

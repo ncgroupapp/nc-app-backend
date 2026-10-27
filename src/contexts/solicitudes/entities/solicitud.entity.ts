@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Relation,
   Unique,
   UpdateDateColumn,
 } from "typeorm";
@@ -33,7 +34,7 @@ export class Solicitud {
 
   @ManyToOne(() => MailAccount, { onDelete: "CASCADE" })
   @JoinColumn({ name: "mailAccountId" })
-  mailAccount?: MailAccount;
+  mailAccount?: Relation<MailAccount>;
 
   @Column({ type: "int" })
   mailAccountId!: number;
@@ -80,7 +81,7 @@ export class Solicitud {
   unread!: boolean;
 
   @OneToMany(() => SolicitudMessage, (message) => message.solicitud)
-  messages?: SolicitudMessage[];
+  messages?: Relation<SolicitudMessage>[];
 
   @CreateDateColumn()
   createdAt!: Date;

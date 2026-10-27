@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Relation,
   Unique,
 } from "typeorm";
 import { Solicitud } from "./solicitud.entity";
@@ -22,7 +23,7 @@ export class SolicitudMessage {
 
   @ManyToOne(() => Solicitud, (solicitud) => solicitud.messages, { onDelete: "CASCADE" })
   @JoinColumn({ name: "solicitudId" })
-  solicitud?: Solicitud;
+  solicitud?: Relation<Solicitud>;
 
   @Column({ type: "int" })
   solicitudId!: number;
@@ -59,7 +60,7 @@ export class SolicitudMessage {
   outgoing!: boolean;
 
   @OneToMany(() => SolicitudAttachment, (attachment) => attachment.message)
-  attachments?: SolicitudAttachment[];
+  attachments?: Relation<SolicitudAttachment>[];
 
   @CreateDateColumn()
   createdAt!: Date;
