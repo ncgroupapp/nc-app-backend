@@ -20,7 +20,7 @@ export class MailAccount {
   encryptedRefreshToken?: string | null;
 
   /** Etiqueta de Gmail cuyos hilos se registran como solicitudes. */
-  @Column({ type: "varchar", length: 100, default: "Solicitudes" })
+  @Column({ type: "varchar", length: 100, default: "Cotizaciones" })
   labelName!: string;
 
   @Column({ type: "boolean", default: true })

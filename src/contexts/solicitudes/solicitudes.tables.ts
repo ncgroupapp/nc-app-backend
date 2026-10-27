@@ -9,7 +9,7 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
     "email" character varying(255) NOT NULL UNIQUE,
     "provider" character varying(20) NOT NULL DEFAULT 'gmail',
     "encryptedRefreshToken" text,
-    "labelName" character varying(100) NOT NULL DEFAULT 'Solicitudes',
+    "labelName" character varying(100) NOT NULL DEFAULT 'Cotizaciones',
     "active" boolean NOT NULL DEFAULT true,
     "needsReconnect" boolean NOT NULL DEFAULT false,
     "lastSyncAt" TIMESTAMP,
@@ -19,6 +19,10 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
     "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
     "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
   );
+
+  -- The watched Gmail label is "Cotizaciones" (it was "Solicitudes" in the first version)
+  ALTER TABLE "mail_accounts" ALTER COLUMN "labelName" SET DEFAULT 'Cotizaciones';
+  UPDATE "mail_accounts" SET "labelName" = 'Cotizaciones' WHERE "labelName" = 'Solicitudes';
 
   CREATE TABLE IF NOT EXISTS "solicitudes" (
     "id" SERIAL PRIMARY KEY,

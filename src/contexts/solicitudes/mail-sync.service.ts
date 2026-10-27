@@ -235,11 +235,19 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const accessToken = await this.getAccessToken(account.id);
-      const label = (await listLabels(accessToken)).find(
-        (l) => l.name.toLowerCase() === account.labelName.toLowerCase(),
-      );
+      const labels = await listLabels(accessToken);
+      const wanted = account.labelName.trim().toLowerCase();
+      const label = labels.find((l) => l.name.trim().toLowerCase() === wanted);
       if (!label) {
-        throw new Error(`No existe la etiqueta "${account.labelName}" en ${account.email}`);
+        // Help spot typos or nested labels (e.g. "Trabajo/Solicitudes")
+        const similar = labels
+          .map((l) => l.name)
+          .filter((name) => name.toLowerCase().includes(wanted.slice(0, 5)))
+          .slice(0, 5);
+        throw new Error(
+          `No existe la etiqueta "${account.labelName}" en ${account.email}` +
+            (similar.length ? `. Parecidas: ${similar.join(", ")}` : ""),
+        );
       }
 
       const remoteThreads: Array<{ id: string; historyId?: string }> = [];
