@@ -10,6 +10,9 @@ import {
   IsPositive,
   Min,
   Max,
+  ArrayMaxSize,
+  Matches,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -113,6 +116,19 @@ export class CreateQuotationItemDto {
   notes?: string;
 }
 
+export class ObservationImageDto {
+  @ApiProperty({ description: 'Imagen en Firebase Storage', example: 'https://firebasestorage.googleapis.com/v0/b/...' })
+  @IsString()
+  @Matches(/^https:\/\/firebasestorage\.googleapis\.com\//, { message: 'La imagen debe estar subida a la app' })
+  url!: string;
+
+  @ApiPropertyOptional({ description: 'Texto debajo de la imagen', example: 'FILTRO DE AIRE 37/AI9837' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  caption?: string | null;
+}
+
 export class CreateQuotationDto {
   @ApiProperty({ description: 'Identificador único de la cotización', example: 'COT-2024-001' })
   @IsString()
@@ -140,6 +156,14 @@ export class CreateQuotationDto {
   @IsOptional()
   @IsString()
   observations?: string;
+
+  @ApiPropertyOptional({ description: 'Imágenes que salen debajo de las observaciones en el PDF', type: [ObservationImageDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => ObservationImageDto)
+  observationImages?: ObservationImageDto[];
 
   @ApiProperty({ description: 'Items de la cotización', type: [CreateQuotationItemDto] })
   @IsArray()

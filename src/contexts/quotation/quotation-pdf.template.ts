@@ -33,9 +33,16 @@ const COMPANY = {
   emails: "ncgroup@ncgroup.com.uy  ·  ncgroup.importaciones@ncgroup.com.uy",
 };
 
+export interface ObservationImageAsset {
+  data: Buffer;
+  caption: string | null;
+}
+
 export interface QuotationPdfAssets {
   logo?: Buffer | null;
   signature?: Buffer | null;
+  /** Product images drawn under the observations, already downloaded. */
+  observationImages?: ObservationImageAsset[];
 }
 
 interface Column {
@@ -334,9 +341,18 @@ export function renderQuotationPdf(doc: PDFKit.PDFDocument, quotation: Quotation
   doc.rect(MARGIN, y, contentWidth, obsHeight).lineWidth(0.6).strokeColor(LINE).stroke();
   doc.rect(MARGIN, y, 2.5, obsHeight).fill(BLUE);
   doc.fillColor(MUTED).text(observations, MARGIN + 12, y + 8, { width: contentWidth - 20 });
+  y += obsHeight;
+
+  // === IMÁGENES DE LAS OBSERVACIONES ===
+  y = drawObservationImages(doc, assets.observationImages ?? [], y + 10, contentWidth, pageHeight);
 
   // === FIRMA ===
-  y += obsHeight + 24;
+  y += 24;
+  // Keep the signature block together on one page
+  if (y + 120 > pageHeight - 60) {
+    doc.addPage();
+    y = 36;
+  }
   doc.font("Helvetica").fontSize(9).fillColor(INK).text("Atentamente,", MARGIN, y);
   y = doc.y + 4;
   const signatureLineWidth = 175;
@@ -360,4 +376,76 @@ export function renderQuotationPdf(doc: PDFKit.PDFDocument, quotation: Quotation
       .text(COMPANY.address, MARGIN, footerY + 9, { width: contentWidth, align: "center", lineBreak: false })
       .text(COMPANY.emails, MARGIN, footerY + 21, { width: contentWidth, align: "center", lineBreak: false });
   }
+}
+
+/**
+ * Draws the observation images in a grid (1 column for a single image, 2 otherwise).
+ * Images keep their proportions and are never enlarged beyond their natural size at
+ * 72 dpi × 0.75, so small photos stay sharp instead of pixelated. Returns the y after them.
+ */
+function drawObservationImages(
+  doc: PDFKit.PDFDocument,
+  images: ObservationImageAsset[],
+  startY: number,
+  contentWidth: number,
+  pageHeight: number,
+): number {
+  if (images.length === 0) return startY - 10;
+
+  const columns = images.length === 1 ? 1 : 2;
+  const gap = 12;
+  const cellWidth = (contentWidth - gap * (columns - 1)) / columns;
+  const imageBoxHeight = columns === 1 ? 280 : 200;
+  const captionHeight = 16;
+  const cellHeight = imageBoxHeight + captionHeight + 12;
+  const bottomLimit = pageHeight - 70;
+  let y = startY;
+
+  images.forEach((image, index) => {
+    const column = index % columns;
+    if (column === 0 && index > 0) y += cellHeight + gap;
+    if (column === 0 && y + cellHeight > bottomLimit) {
+      doc.addPage();
+      y = 36;
+    }
+    const x = MARGIN + column * (cellWidth + gap);
+    doc.rect(x, y, cellWidth, cellHeight).lineWidth(0.6).strokeColor(LINE).stroke();
+
+    const img = imageSize(image.data);
+    if (!img) return;
+    const boxWidth = cellWidth - 16;
+    const boxHeight = imageBoxHeight - 8;
+    const scale = Math.min(boxWidth / img.width, boxHeight / img.height, 0.75);
+    const width = img.width * scale;
+    const height = img.height * scale;
+    doc.image(image.data, x + 8 + (boxWidth - width) / 2, y + 8 + (boxHeight - height) / 2, { width, height });
+
+    if (image.caption) {
+      doc.font("Helvetica-Bold").fontSize(8).fillColor(NAVY)
+        .text(image.caption, x + 6, y + imageBoxHeight + 4, { width: cellWidth - 12, align: "center", lineBreak: false, ellipsis: true });
+    }
+  });
+
+  return y + cellHeight;
+}
+
+/** Pixel size of a PNG or JPEG from its header, or null when it cannot be read. */
+function imageSize(data: Buffer): { width: number; height: number } | null {
+  // PNG: IHDR chunk right after the 8-byte signature
+  if (data.length > 24 && data[0] === 0x89 && data[1] === 0x50) {
+    return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+  }
+  // JPEG: walk the segments until a Start Of Frame marker
+  if (data[0] === 0xff && data[1] === 0xd8) {
+    let offset = 2;
+    while (offset + 9 < data.length) {
+      if (data[offset] !== 0xff) return null;
+      const marker = data[offset + 1]!;
+      const length = data.readUInt16BE(offset + 2);
+      const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+      if (isSof) return { height: data.readUInt16BE(offset + 5), width: data.readUInt16BE(offset + 7) };
+      offset += 2 + length;
+    }
+  }
+  return null;
 }

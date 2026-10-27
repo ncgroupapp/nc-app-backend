@@ -43,6 +43,10 @@ export class Quotation {
   @Column({ type: "text", nullable: true })
   observations?: string;
 
+  /** Product images shown under the observations in the PDF (Firebase Storage URLs). */
+  @Column({ type: "jsonb", nullable: true })
+  observationImages?: Array<{ url: string; caption?: string | null }> | null;
+
   @Column({ type: "varchar", length: 255, nullable: true })
   clientName?: string;
 
