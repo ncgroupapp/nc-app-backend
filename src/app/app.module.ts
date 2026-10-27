@@ -20,6 +20,7 @@ import { ImportsModule } from "../contexts/imports/imports.module";
 import { ManualsModule } from "../contexts/manuals/manuals.module";
 import { BrandsModule } from "@/contexts/brands/brands.module";
 import { StockModule } from "../contexts/stock/stock.module";
+import { SolicitudesModule } from "../contexts/solicitudes/solicitudes.module";
 
 import { AuthMiddleware } from "@/src/contexts/auth/middlewares/auth.middleware";
 import { LoggerMiddleware } from "@/shared/logger/logger.middleware";
@@ -45,6 +46,7 @@ import { CorrelationIdMiddleware } from "@/shared/middlewares/correlation-id.mid
     ManualsModule,
     BrandsModule,
     StockModule,
+    SolicitudesModule,
   ],
 })
 export class AppModule implements NestModule {
@@ -56,6 +58,8 @@ export class AppModule implements NestModule {
         { path: "/auth/login", method: RequestMethod.OPTIONS },
         { path: "/api", method: RequestMethod.GET },
         { path: "/api/(.*)", method: RequestMethod.GET },
+        // Google redirects the browser here after authorizing a mailbox (protected by a signed state)
+        { path: "/solicitudes/mail/callback", method: RequestMethod.GET },
       )
       .forRoutes("*");
 
