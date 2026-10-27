@@ -42,8 +42,8 @@ export class LicitationsService {
     const year = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCFullYear();
     const prefix = `NC-${year}-`;
     const rows: Array<{ max: number | null }> = await this.licitationRepository.query(
-      `SELECT MAX(CAST(substring("internalNumber" FROM '^NC-[0-9]{4}-([0-9]+)$') AS integer)) AS max
-         FROM licitations WHERE "internalNumber" LIKE $1`,
+      `SELECT MAX(CAST(substring(trim("internalNumber") FROM '^NC-[0-9]{4}-([0-9]+)$') AS integer)) AS max
+         FROM licitations WHERE trim("internalNumber") LIKE $1`,
       [`${prefix}%`],
     );
     const next = (rows[0]?.max ?? 0) + 1;
