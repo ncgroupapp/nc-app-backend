@@ -23,6 +23,10 @@ export class MailAccount {
   @Column({ type: "varchar", length: 100, default: "Solicitudes,Cotizaciones" })
   labelName!: string;
 
+  /** Only threads started from this date on are imported (a week before connecting). */
+  @Column({ type: "timestamp", nullable: true })
+  importSince?: Date | null;
+
   @Column({ type: "boolean", default: true })
   active!: boolean;
 

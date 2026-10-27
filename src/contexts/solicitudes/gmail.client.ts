@@ -170,9 +170,11 @@ export async function listThreads(
   accessToken: string,
   labelId: string,
   pageToken?: string,
+  query?: string,
 ): Promise<{ threads: Array<{ id: string; historyId?: string }>; nextPageToken?: string }> {
   const params = new URLSearchParams({ labelIds: labelId, maxResults: "100" });
   if (pageToken) params.set("pageToken", pageToken);
+  if (query) params.set("q", query);
   const result = await gmailGet<{ threads?: Array<{ id: string; historyId?: string }>; nextPageToken?: string }>(
     accessToken,
     `/threads?${params.toString()}`,

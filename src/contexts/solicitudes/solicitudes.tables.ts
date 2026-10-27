@@ -24,6 +24,10 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
   ALTER TABLE "mail_accounts" ALTER COLUMN "labelName" SET DEFAULT 'Solicitudes,Cotizaciones';
   UPDATE "mail_accounts" SET "labelName" = 'Solicitudes,Cotizaciones' WHERE "labelName" IN ('Solicitudes', 'Cotizaciones');
 
+  -- Only threads from a week before connecting onward are imported
+  ALTER TABLE "mail_accounts" ADD COLUMN IF NOT EXISTS "importSince" TIMESTAMP;
+  UPDATE "mail_accounts" SET "importSince" = "createdAt" - INTERVAL '7 days' WHERE "importSince" IS NULL;
+
   CREATE TABLE IF NOT EXISTS "solicitudes" (
     "id" SERIAL PRIMARY KEY,
     "mailAccountId" integer NOT NULL REFERENCES "mail_accounts"("id") ON DELETE CASCADE,
@@ -77,5 +81,9 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
     "size" integer NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP NOT NULL DEFAULT now()
   );
+  -- Keep only client requests: drop threads started by the mailbox itself or before importSince
+  DELETE FROM "solicitudes" s USING "mail_accounts" a
+    WHERE s."mailAccountId" = a."id"
+      AND (lower(s."fromEmail") = lower(a."email") OR (a."importSince" IS NOT NULL AND s."receivedAt" < a."importSince"));
   CREATE INDEX IF NOT EXISTS "IDX_solicitud_attachments_messageId" ON "solicitud_attachments" ("messageId");
 `;

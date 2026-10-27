@@ -39,6 +39,8 @@ import { CREATE_SOLICITUDES_TABLES_SQL } from "./solicitudes.tables";
 const DEFAULT_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 /** Max pages of 100 threads read per sync (the first sync of a busy label). */
 const MAX_THREAD_PAGES = 5;
+/** On connection, threads from this many days back are imported (older ones are history). */
+const IMPORT_LOOKBACK_DAYS = 7;
 /** Longest pause after repeated failures: 30 sync cycles (~1 hour with the default interval). */
 const MAX_BACKOFF_CYCLES = 30;
 
@@ -69,6 +71,8 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
   private readonly cipher: TokenCipher;
   private readonly accessTokens = new Map<number, CachedAccessToken>();
   private readonly skipCycles = new Map<number, number>();
+  /** Threads that are not client requests (ours or too old), by account, with the historyId seen. */
+  private readonly ignoredThreads = new Map<number, Map<string, string | undefined>>();
   private timer: NodeJS.Timeout | null = null;
   private syncing = false;
 
@@ -146,7 +150,7 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
       if (!tokens.refresh_token) return back("error", "Google no devolvió el permiso permanente. Probá de nuevo.");
 
       let account = await this.accountRepository.findOne({ where: { email } });
-      if (!account) account = this.accountRepository.create({ email });
+      if (!account) account = this.accountRepository.create({ email, importSince: defaultImportSince() });
       account.encryptedRefreshToken = this.cipher.encrypt(tokens.refresh_token);
       account.active = true;
       account.needsReconnect = false;
@@ -255,12 +259,16 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
+      // Only threads with activity since importSince (Gmail "after:" takes epoch seconds)
+      const since = account.importSince ?? defaultImportSince();
+      const query = `after:${Math.floor(since.getTime() / 1000)}`;
+
       // A thread can carry several of the labels: keep each thread once
       const threadsById = new Map<string, { id: string; historyId?: string }>();
       for (const label of found) {
         let pageToken: string | undefined;
         for (let page = 0; page < MAX_THREAD_PAGES; page++) {
-          const result = await listThreads(accessToken, label.id, pageToken);
+          const result = await listThreads(accessToken, label.id, pageToken, query);
           result.threads.forEach((thread) => threadsById.set(thread.id, thread));
           pageToken = result.nextPageToken;
           if (!pageToken) break;
@@ -278,11 +286,18 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
 
       let imported = 0;
       let updated = 0;
+      const ignored = this.ignoredThreads.get(account.id) ?? new Map<string, string | undefined>();
+      this.ignoredThreads.set(account.id, ignored);
       // Oldest first, so solicitudes are created in arrival order
       for (const remote of [...remoteThreads].reverse()) {
         const existing = knownByThread.get(remote.id);
         if (existing && existing.gmailHistoryId === remote.historyId) continue;
-        const added = await this.importThread(account, accessToken, remote.id);
+        if (!existing && ignored.has(remote.id) && ignored.get(remote.id) === remote.historyId) continue;
+        const added = await this.importThread(account, accessToken, remote.id, since, !existing);
+        if (added === null) {
+          ignored.set(remote.id, remote.historyId);
+          continue;
+        }
         if (existing) {
           if (added > 0) updated++;
         } else {
@@ -324,8 +339,17 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
 
   // --- Internals ---
 
-  /** Downloads a thread and stores the messages not imported yet. Returns how many were added. */
-  private async importThread(account: MailAccount, accessToken: string, threadId: string): Promise<number> {
+  /**
+   * Downloads a thread and stores the messages not imported yet. Returns how many were added,
+   * or null when a new thread is not a client request: started by us or before `since`.
+   */
+  private async importThread(
+    account: MailAccount,
+    accessToken: string,
+    threadId: string,
+    since: Date,
+    isNew: boolean,
+  ): Promise<number | null> {
     const thread = await getThread(accessToken, threadId);
     const messages = (thread.messages ?? []).filter((m) => !m.labelIds?.includes("DRAFT"));
     if (messages.length === 0) return 0;
@@ -334,6 +358,7 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
     const first = sorted[0]!;
     const last = sorted[sorted.length - 1]!;
     const firstFrom = parseAddress(header(first, "From"));
+    if (isNew && (firstFrom.email === account.email || messageDate(first) < since)) return null;
 
     return this.dataSource.transaction(async (manager) => {
       let solicitud = await manager.findOne(Solicitud, { where: { mailAccountId: account.id, gmailThreadId: threadId } });
@@ -470,6 +495,10 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
   private frontUrl(): string {
     return (this.configService.get<string>("FRONT_URL") || "https://nc-app-kappa.vercel.app").replace(/\/+$/, "");
   }
+}
+
+function defaultImportSince(): Date {
+  return new Date(Date.now() - IMPORT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 }
 
 function messageDate(message: GmailMessage): Date {
