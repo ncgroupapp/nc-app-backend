@@ -25,6 +25,7 @@ import {
   getAttachment,
   getThread,
   header,
+  htmlToText,
   listLabels,
   listThreads,
   parseAddress,
@@ -235,29 +236,37 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const accessToken = await this.getAccessToken(account.id);
+      // labelName holds one or more Gmail labels separated by commas (e.g. "Solicitudes,Cotizaciones")
+      const wantedNames = account.labelName
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean);
       const labels = await listLabels(accessToken);
-      const wanted = account.labelName.trim().toLowerCase();
-      const label = labels.find((l) => l.name.trim().toLowerCase() === wanted);
-      if (!label) {
+      const found = labels.filter((l) => wantedNames.some((w) => w.toLowerCase() === l.name.trim().toLowerCase()));
+      if (found.length === 0) {
         // Help spot typos or nested labels (e.g. "Trabajo/Solicitudes")
         const similar = labels
           .map((l) => l.name)
-          .filter((name) => name.toLowerCase().includes(wanted.slice(0, 5)))
+          .filter((name) => wantedNames.some((w) => name.toLowerCase().includes(w.toLowerCase().slice(0, 5))))
           .slice(0, 5);
         throw new Error(
-          `No existe la etiqueta "${account.labelName}" en ${account.email}` +
+          `No existe ninguna de las etiquetas "${wantedNames.join('", "')}" en ${account.email}` +
             (similar.length ? `. Parecidas: ${similar.join(", ")}` : ""),
         );
       }
 
-      const remoteThreads: Array<{ id: string; historyId?: string }> = [];
-      let pageToken: string | undefined;
-      for (let page = 0; page < MAX_THREAD_PAGES; page++) {
-        const result = await listThreads(accessToken, label.id, pageToken);
-        remoteThreads.push(...result.threads);
-        pageToken = result.nextPageToken;
-        if (!pageToken) break;
+      // A thread can carry several of the labels: keep each thread once
+      const threadsById = new Map<string, { id: string; historyId?: string }>();
+      for (const label of found) {
+        let pageToken: string | undefined;
+        for (let page = 0; page < MAX_THREAD_PAGES; page++) {
+          const result = await listThreads(accessToken, label.id, pageToken);
+          result.threads.forEach((thread) => threadsById.set(thread.id, thread));
+          pageToken = result.nextPageToken;
+          if (!pageToken) break;
+        }
       }
+      const remoteThreads = [...threadsById.values()];
 
       const known = remoteThreads.length
         ? await this.solicitudRepository.find({
@@ -392,7 +401,8 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
       solicitud.gmailHistoryId = thread.historyId ?? null;
       solicitud.messagesCount = existingIds.size + added;
       solicitud.lastMessageAt = messageDate(last);
-      solicitud.snippet = last.snippet ?? solicitud.snippet ?? null;
+      // Gmail returns snippets HTML-escaped
+      solicitud.snippet = last.snippet ? htmlToText(last.snippet) : (solicitud.snippet ?? null);
       if (incomingAdded) solicitud.unread = true;
       await manager.save(solicitud);
       return added;

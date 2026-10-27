@@ -19,8 +19,8 @@ export class MailAccount {
   @Column({ type: "text", nullable: true, select: false })
   encryptedRefreshToken?: string | null;
 
-  /** Etiqueta de Gmail cuyos hilos se registran como solicitudes. */
-  @Column({ type: "varchar", length: 100, default: "Cotizaciones" })
+  /** Etiquetas de Gmail (separadas por coma) cuyos hilos se registran como solicitudes. */
+  @Column({ type: "varchar", length: 100, default: "Solicitudes,Cotizaciones" })
   labelName!: string;
 
   @Column({ type: "boolean", default: true })

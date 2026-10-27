@@ -9,7 +9,7 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
     "email" character varying(255) NOT NULL UNIQUE,
     "provider" character varying(20) NOT NULL DEFAULT 'gmail',
     "encryptedRefreshToken" text,
-    "labelName" character varying(100) NOT NULL DEFAULT 'Cotizaciones',
+    "labelName" character varying(100) NOT NULL DEFAULT 'Solicitudes,Cotizaciones',
     "active" boolean NOT NULL DEFAULT true,
     "needsReconnect" boolean NOT NULL DEFAULT false,
     "lastSyncAt" TIMESTAMP,
@@ -20,9 +20,9 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
     "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
   );
 
-  -- The watched Gmail label is "Cotizaciones" (it was "Solicitudes" in the first version)
-  ALTER TABLE "mail_accounts" ALTER COLUMN "labelName" SET DEFAULT 'Cotizaciones';
-  UPDATE "mail_accounts" SET "labelName" = 'Cotizaciones' WHERE "labelName" = 'Solicitudes';
+  -- Watched Gmail labels: both "Solicitudes" and "Cotizaciones" (the first version used only one)
+  ALTER TABLE "mail_accounts" ALTER COLUMN "labelName" SET DEFAULT 'Solicitudes,Cotizaciones';
+  UPDATE "mail_accounts" SET "labelName" = 'Solicitudes,Cotizaciones' WHERE "labelName" IN ('Solicitudes', 'Cotizaciones');
 
   CREATE TABLE IF NOT EXISTS "solicitudes" (
     "id" SERIAL PRIMARY KEY,
@@ -44,6 +44,9 @@ export const CREATE_SOLICITUDES_TABLES_SQL = `
     "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
     CONSTRAINT "UQ_solicitudes_thread" UNIQUE ("mailAccountId", "gmailThreadId")
   );
+  -- Snippets imported before HTML entities were decoded
+  UPDATE "solicitudes" SET "snippet" = replace(replace(replace(replace(replace("snippet", '&lt;', '<'), '&gt;', '>'), '&quot;', '"'), '&#39;', ''''), '&amp;', '&')
+    WHERE "snippet" LIKE '%&%;%';
   CREATE INDEX IF NOT EXISTS "IDX_solicitudes_status" ON "solicitudes" ("status");
   CREATE INDEX IF NOT EXISTS "IDX_solicitudes_lastMessageAt" ON "solicitudes" ("lastMessageAt");
 

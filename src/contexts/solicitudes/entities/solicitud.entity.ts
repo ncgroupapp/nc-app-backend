@@ -22,7 +22,7 @@ export enum SolicitudStatus {
 }
 
 /**
- * Solicitud recibida por mail. Cada hilo de Gmail con la etiqueta "Cotizaciones"
+ * Solicitud recibida por mail. Cada hilo de Gmail con la etiqueta "Solicitudes" o "Cotizaciones"
  * es una solicitud; las respuestas del mismo hilo se agregan a su historial.
  */
 @Entity("solicitudes")
