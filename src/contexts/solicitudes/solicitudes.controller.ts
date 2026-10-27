@@ -24,6 +24,7 @@ import { FilterSolicitudesDto } from "./dto/filter-solicitudes.dto";
 import { UpdateSolicitudDto } from "./dto/update-solicitud.dto";
 import { Solicitud } from "./entities/solicitud.entity";
 import { MailAccountView, MailSyncService } from "./mail-sync.service";
+import { LicitacionDraft, LicitacionDraftService } from "./licitacion-draft.service";
 import { SolicitudesService, SolicitudesSummary } from "./solicitudes.service";
 
 @ApiTags("solicitudes")
@@ -35,6 +36,7 @@ export class SolicitudesController {
   constructor(
     private readonly solicitudesService: SolicitudesService,
     private readonly mailSyncService: MailSyncService,
+    private readonly licitacionDraftService: LicitacionDraftService,
   ) {}
 
   @Get()
@@ -109,6 +111,12 @@ export class SolicitudesController {
   @ApiResponse({ status: 404, description: "Solicitud no encontrada" })
   async findOne(@Param("id", ParseIntPipe) id: number): Promise<Solicitud> {
     return this.solicitudesService.findOne(id);
+  }
+
+  @Get(":id/licitacion-draft")
+  @ApiOperation({ summary: "Datos leídos del mail y sus PDF para armar la licitación (cierre y productos)" })
+  async getLicitacionDraft(@Param("id", ParseIntPipe) id: number): Promise<LicitacionDraft> {
+    return this.licitacionDraftService.buildDraft(id);
   }
 
   @Patch(":id")
