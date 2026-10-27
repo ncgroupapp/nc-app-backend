@@ -378,10 +378,15 @@ export function renderQuotationPdf(doc: PDFKit.PDFDocument, quotation: Quotation
   }
 }
 
+/** Space kept below the images for "Atentamente", the signature and the signer lines. */
+const SIGNATURE_BLOCK_HEIGHT = 150;
+
 /**
- * Draws the observation images in a grid (1 column for a single image, 2 otherwise).
- * Images keep their proportions and are never enlarged beyond their natural size at
- * 72 dpi × 0.75, so small photos stay sharp instead of pixelated. Returns the y after them.
+ * Draws the observation images in a grid sized to fit, together with the signature, in the
+ * space left on the current page: more columns and smaller images when there are many.
+ * Images keep their proportions and are never enlarged beyond their natural size, so small
+ * photos stay sharp. Only if they cannot fit even at the minimum size, a new page is used.
+ * Returns the y after the images.
  */
 function drawObservationImages(
   doc: PDFKit.PDFDocument,
@@ -392,41 +397,66 @@ function drawObservationImages(
 ): number {
   if (images.length === 0) return startY - 10;
 
-  const columns = images.length === 1 ? 1 : 2;
-  const gap = 12;
-  const cellWidth = (contentWidth - gap * (columns - 1)) / columns;
-  const imageBoxHeight = columns === 1 ? 280 : 200;
-  const captionHeight = 16;
-  const cellHeight = imageBoxHeight + captionHeight + 12;
-  const bottomLimit = pageHeight - 70;
+  const gap = 8;
+  const captionHeight = 22;
+  const minImageHeight = 45;
+  const bottomLimit = pageHeight - 60 - SIGNATURE_BLOCK_HEIGHT;
   let y = startY;
+
+  const layoutFor = (available: number) => {
+    // Try from few big images to many small ones; take the first that fits the space
+    const maxColumns = Math.min(images.length, 6);
+    for (let columns = images.length === 1 ? 1 : 2; columns <= maxColumns; columns++) {
+      const rows = Math.ceil(images.length / columns);
+      const cellWidth = (contentWidth - gap * (columns - 1)) / columns;
+      const fitHeight = (available - gap * (rows - 1)) / rows - captionHeight - 10;
+      // Never taller than the image box would be at its width (avoids empty space)
+      const imageHeight = Math.min(fitHeight, cellWidth * 0.75, columns === 1 ? 220 : 160);
+      if (imageHeight >= minImageHeight) return { columns, rows, cellWidth, imageHeight };
+    }
+    return null;
+  };
+
+  let layout = layoutFor(bottomLimit - y);
+  if (!layout) {
+    // Not even the smallest grid fits here: start a new page with the full height
+    doc.addPage();
+    y = 36;
+    const fallbackColumns = Math.min(images.length, 6);
+    layout = layoutFor(bottomLimit - y) ?? {
+      columns: fallbackColumns,
+      rows: Math.ceil(images.length / fallbackColumns),
+      cellWidth: (contentWidth - gap * (fallbackColumns - 1)) / fallbackColumns,
+      imageHeight: minImageHeight,
+    };
+  }
+
+  const { columns, cellWidth, imageHeight } = layout;
+  const cellHeight = imageHeight + captionHeight + 10;
 
   images.forEach((image, index) => {
     const column = index % columns;
-    if (column === 0 && index > 0) y += cellHeight + gap;
-    if (column === 0 && y + cellHeight > bottomLimit) {
-      doc.addPage();
-      y = 36;
-    }
+    const row = Math.floor(index / columns);
     const x = MARGIN + column * (cellWidth + gap);
-    doc.rect(x, y, cellWidth, cellHeight).lineWidth(0.6).strokeColor(LINE).stroke();
+    const cellY = y + row * (cellHeight + gap);
+    doc.rect(x, cellY, cellWidth, cellHeight).lineWidth(0.6).strokeColor(LINE).stroke();
 
     const img = imageSize(image.data);
     if (!img) return;
-    const boxWidth = cellWidth - 16;
-    const boxHeight = imageBoxHeight - 8;
+    const boxWidth = cellWidth - 10;
+    const boxHeight = imageHeight - 4;
     const scale = Math.min(boxWidth / img.width, boxHeight / img.height, 0.75);
     const width = img.width * scale;
     const height = img.height * scale;
-    doc.image(image.data, x + 8 + (boxWidth - width) / 2, y + 8 + (boxHeight - height) / 2, { width, height });
+    doc.image(image.data, x + 5 + (boxWidth - width) / 2, cellY + 5 + (boxHeight - height) / 2, { width, height });
 
     if (image.caption) {
-      doc.font("Helvetica-Bold").fontSize(8).fillColor(NAVY)
-        .text(image.caption, x + 6, y + imageBoxHeight + 4, { width: cellWidth - 12, align: "center", lineBreak: false, ellipsis: true });
+      doc.font("Helvetica-Bold").fontSize(columns > 2 ? 6.5 : 7.5).fillColor(NAVY)
+        .text(image.caption, x + 4, cellY + imageHeight + 3, { width: cellWidth - 8, height: 18, align: "center", ellipsis: true });
     }
   });
 
-  return y + cellHeight;
+  return y + layout.rows * cellHeight + (layout.rows - 1) * gap;
 }
 
 /** Pixel size of a PNG or JPEG from its header, or null when it cannot be read. */
