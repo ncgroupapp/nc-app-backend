@@ -90,7 +90,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       data: message as string,
     };
 
-    await response.code(status).send(responseBody);
+    // Errors thrown from middleware get the raw Node response, not a Fastify reply
+    if (typeof response.code === "function") {
+      await response.code(status).send(responseBody);
+      return;
+    }
+    const raw = response as unknown as import("http").ServerResponse;
+    if (!raw.headersSent) {
+      raw.statusCode = status;
+      raw.setHeader("Content-Type", "application/json; charset=utf-8");
+    }
+    raw.end(JSON.stringify(responseBody));
   }
 
   /**
