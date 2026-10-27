@@ -19,7 +19,7 @@ import {
   ApiOperation,
   ApiResponse,
 } from "@nestjs/swagger";
-import { LicitationsService } from "./licitations.service";
+import { LicitationDeleteImpact, LicitationsService } from "./licitations.service";
 import { CreateLicitationDto } from "./dto/create-licitation.dto";
 import { UpdateLicitationDto } from "./dto/update-licitation.dto";
 import { Licitation } from "./entities/licitation.entity";
@@ -97,6 +97,12 @@ export class LicitationsController {
   ): Promise<Licitation> {
     this.logger.log(`PATCH /licitations/${id} - Updating licitation`);
     return this.licitationsService.update(id, updateLicitationDto);
+  }
+
+  @Get(":id/delete-impact")
+  @ApiOperation({ summary: "What deleting a licitation would remove (quotations) and whether it is allowed" })
+  async getDeleteImpact(@Param("id", ParseIntPipe) id: number): Promise<LicitationDeleteImpact> {
+    return this.licitationsService.getDeleteImpact(id);
   }
 
   @Delete(":id")

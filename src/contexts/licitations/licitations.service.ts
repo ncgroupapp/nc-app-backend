@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -16,6 +17,13 @@ import { Quotation, QuotationStatus } from "@/contexts/quotation/entities/quotat
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
+
+export interface LicitationDeleteImpact {
+  quotations: Array<{ id: number; identifier: string; status: string }>;
+  adjudications: number;
+  deliveries: number;
+  canDelete: boolean;
+}
 
 @Injectable()
 export class LicitationsService {
@@ -295,12 +303,54 @@ export class LicitationsService {
     );
   }
 
+  /**
+   * What deleting a licitation would remove. Licitations with adjudications or deliveries
+   * cannot be deleted (they are real business records); their quotations are deleted with it.
+   */
+  async getDeleteImpact(id: number): Promise<LicitationDeleteImpact> {
+    const licitation = await this.licitationRepository.findOne({ where: { id } });
+    if (!licitation) throw new NotFoundException(`Licitación ${id} no encontrada`);
+
+    const quotations = await this.quotationRepository.find({
+      where: { licitationId: id },
+      select: ["id", "quotationIdentifier", "status"],
+    });
+    const quotationIds = quotations.map((q) => q.id);
+    const [{ adjudications }] = await this.licitationRepository.query(
+      `SELECT count(*)::int AS adjudications FROM adjudications
+        WHERE "licitationId" = $1 OR ("quotationId" = ANY($2::int[]))`,
+      [id, quotationIds],
+    );
+    const [{ deliveries }] = await this.licitationRepository.query(
+      `SELECT count(*)::int AS deliveries FROM deliveries WHERE "licitationId" = $1`,
+      [id],
+    );
+    return {
+      quotations: quotations.map((q) => ({ id: q.id, identifier: q.quotationIdentifier, status: q.status })),
+      adjudications,
+      deliveries,
+      canDelete: adjudications === 0 && deliveries === 0,
+    };
+  }
+
   async remove(id: number): Promise<void> {
     this.logger.log(`Deleting licitation with ID: ${id}`);
     const licitation = await this.findOne(id);
+    const impact = await this.getDeleteImpact(id);
+    if (!impact.canDelete) {
+      throw new ConflictException(
+        `No se puede eliminar la licitación ${licitation.callNumber}: tiene ${impact.adjudications} adjudicación(es) y ${impact.deliveries} entrega(s)`,
+      );
+    }
 
     try {
-      await this.licitationRepository.remove(licitation);
+      await this.licitationRepository.manager.transaction(async (manager) => {
+        // Quotations reference the licitation without cascade: delete them first (their items cascade)
+        if (impact.quotations.length > 0) {
+          await manager.delete(Quotation, { id: In(impact.quotations.map((q) => q.id)) });
+        }
+        await manager.remove(licitation);
+      });
       this.logger.log(
         `Licitation deleted successfully: ID ${id}, call number: ${licitation.callNumber}`,
       );
