@@ -7,10 +7,11 @@ import { QuotationPdfService } from './quotation-pdf.service';
 import { AdjudicationsModule } from '../adjudications/adjudications.module';
 import { Product } from '../products/entities/product.entity';
 import { Licitation } from '../licitations/entities/licitation.entity';
+import { Offer } from '../offers/entities/offer.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Quotation, QuotationItem, Product, Licitation]),
+    TypeOrmModule.forFeature([Quotation, QuotationItem, Product, Licitation, Offer]),
     AdjudicationsModule,
   ],
   controllers: [QuotationController],

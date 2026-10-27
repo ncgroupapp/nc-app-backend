@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  ParseIntPipe,
   Delete,
   HttpCode,
   HttpStatus,
@@ -26,6 +27,7 @@ import { QuotationPdfService } from './quotation-pdf.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
 import { UpdateItemAwardStatusDto } from './dto/update-item-award-status.dto';
+import { SetItemOfferDto } from './dto/set-item-offer.dto';
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
 
@@ -219,6 +221,18 @@ export class QuotationController {
       updateItemAwardStatusDto.awardStatus,
       updateItemAwardStatusDto.awardedQuantity,
     );
+  }
+
+  @Patch(":id/item/:itemId/offer")
+  @ApiOperation({ summary: "Elegir la oferta del proveedor que define el costo de un ítem (también en cotizaciones finalizadas)" })
+  @ApiParam({ name: "id", description: "ID de la cotización" })
+  @ApiParam({ name: "itemId", description: "ID del item de la cotización" })
+  async setItemOffer(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("itemId", ParseIntPipe) itemId: number,
+    @Body() dto: SetItemOfferDto,
+  ) {
+    return this.quotationService.setItemOffer(id, itemId, dto.offerId);
   }
 
   @Patch(":id")

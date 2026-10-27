@@ -121,6 +121,17 @@ export class QuotationItem {
   @Column({ type: "varchar", length: 255, nullable: true })
   providerName?: string;
 
+  /** Supplier offer chosen for this item: its price is the cost of the item. */
+  @Column({ type: "int", nullable: true })
+  offerId?: number | null;
+
+  /** Unit cost taken from the chosen offer (snapshot, so later offer edits don't change it). */
+  @Column({ type: "decimal", precision: 12, scale: 2, nullable: true })
+  unitCost?: number | null;
+
+  @Column({ type: "varchar", length: 3, nullable: true })
+  costCurrency?: string | null;
+
   @Column({ type: "boolean", default: false })
   inStock!: boolean;
 

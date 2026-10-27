@@ -18,14 +18,17 @@ export class QuotationPdfService implements OnModuleInit {
 
   constructor(private readonly dataSource: DataSource) {}
 
-  /** Adds the column for observation images when missing (migrations are not run on deploy). */
+  /** Adds columns missing in older databases (migrations are not run on deploy). */
   async onModuleInit(): Promise<void> {
     try {
-      await this.dataSource.query(
-        `ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "observationImages" jsonb`,
-      );
+      await this.dataSource.query(`
+        ALTER TABLE "quotations" ADD COLUMN IF NOT EXISTS "observationImages" jsonb;
+        ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "offerId" integer;
+        ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "unitCost" numeric(12,2);
+        ALTER TABLE "quotation_items" ADD COLUMN IF NOT EXISTS "costCurrency" character varying(3);
+      `);
     } catch (error) {
-      this.logger.error('Could not ensure quotations.observationImages', error instanceof Error ? error.stack : String(error));
+      this.logger.error('Could not ensure quotation columns', error instanceof Error ? error.stack : String(error));
     }
   }
 

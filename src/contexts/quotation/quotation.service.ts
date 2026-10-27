@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
@@ -11,6 +11,7 @@ import { PaginatedResult } from "../shared/interfaces/paginated-result.interface
 import { Product } from '@/contexts/products/entities/product.entity';
 import { Licitation, LicitationStatus } from '@/contexts/licitations/entities/licitation.entity';
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
+import { Offer } from '@/contexts/offers/entities/offer.entity';
 
 @Injectable()
 export class QuotationService {
@@ -23,6 +24,8 @@ export class QuotationService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(Licitation)
     private readonly licitationRepository: Repository<Licitation>,
+    @InjectRepository(Offer)
+    private readonly offerRepository: Repository<Offer>,
     private readonly adjudicationsService: AdjudicationsService,
   ) {}
 
@@ -394,6 +397,41 @@ export class QuotationService {
       totalItems: quotation.items.length,
       itemsByCurrency,
     };
+  }
+
+  /**
+   * Sets the supplier offer that defines the item's cost (or clears it with null).
+   * Only the cost fields change, so it is allowed on finalized quotations too.
+   */
+  async setItemOffer(quotationId: number, itemId: number, offerId: number | null): Promise<QuotationItem> {
+    const item = await this.quotationItemRepository.findOne({ where: { id: itemId, quotationId } });
+    if (!item) {
+      throw new NotFoundException(ERROR_MESSAGES.QUOTATION.ITEM_NOT_FOUND(itemId));
+    }
+
+    if (offerId === null) {
+      item.offerId = null;
+      item.unitCost = null;
+      item.costCurrency = null;
+    } else {
+      const offer = await this.offerRepository.findOne({ where: { id: offerId } });
+      if (!offer) {
+        throw new NotFoundException(ERROR_MESSAGES.OFFERS.NOT_FOUND(offerId));
+      }
+      if (item.productId && offer.productId !== item.productId) {
+        throw new BadRequestException('La oferta elegida es de otro producto');
+      }
+      item.offerId = offer.id;
+      item.unitCost = Number(offer.price);
+      item.costCurrency = offer.currency;
+    }
+
+    await this.quotationItemRepository.update(item.id, {
+      offerId: item.offerId,
+      unitCost: item.unitCost,
+      costCurrency: item.costCurrency,
+    });
+    return item;
   }
 
   async updateItemAwardStatus(

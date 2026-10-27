@@ -53,6 +53,22 @@ export class CreateQuotationItemDto {
   @IsString()
   providerName?: string;
 
+  @ApiPropertyOptional({ description: 'Oferta del proveedor elegida (define el costo)' })
+  @IsOptional()
+  @IsNumber()
+  offerId?: number | null;
+
+  @ApiPropertyOptional({ description: 'Costo unitario de la oferta elegida' })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  unitCost?: number | null;
+
+  @ApiPropertyOptional({ description: 'Moneda del costo', enum: Currency })
+  @IsOptional()
+  @IsEnum(Currency)
+  costCurrency?: Currency | null;
+
   @ApiProperty({ description: 'Indica si el producto está en stock', default: false })
   @IsBoolean()
   inStock!: boolean;
