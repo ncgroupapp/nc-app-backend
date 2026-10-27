@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsDateString,
   IsNotEmpty,
@@ -74,13 +74,13 @@ export class CreateLicitationDto {
   @IsNotEmpty()
   callNumber!: string;
 
-  @ApiProperty({
-    description: "Internal number",
-    example: "INT-2024-001",
+  @ApiPropertyOptional({
+    description: "Internal number. If empty, the next correlative (NC-<year>-<nnn>) is assigned",
+    example: "NC-2026-001",
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  internalNumber!: string;
+  internalNumber?: string;
 
   @ApiProperty({
     description: "Products with quantity",

@@ -34,13 +34,29 @@ export class LicitationsService {
     private readonly quotationRepository: Repository<Quotation>,
   ) {}
 
+  /**
+   * Next correlative internal number for the current year (Uruguay time): NC-2026-001,
+   * NC-2026-002… restarting at 001 every January. Numbers in other formats are ignored.
+   */
+  async nextInternalNumber(): Promise<string> {
+    const year = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCFullYear();
+    const prefix = `NC-${year}-`;
+    const rows: Array<{ max: number | null }> = await this.licitationRepository.query(
+      `SELECT MAX(CAST(substring("internalNumber" FROM '^NC-[0-9]{4}-([0-9]+)$') AS integer)) AS max
+         FROM licitations WHERE "internalNumber" LIKE $1`,
+      [`${prefix}%`],
+    );
+    const next = (rows[0]?.max ?? 0) + 1;
+    return `${prefix}${String(next).padStart(3, "0")}`;
+  }
+
   async create(
     createLicitationDto: CreateLicitationDto,
   ): Promise<Licitation> {
     this.logger.log(
       `Creating licitation with call number: ${createLicitationDto.callNumber}, internal number: ${createLicitationDto.internalNumber}`,
     );
-    const { clientId, products, productIds, startDate, deadlineDate, ...licitationData } =
+    const { clientId, products, productIds, startDate, deadlineDate, internalNumber, ...licitationData } =
       createLicitationDto;
 
     const start = new Date(startDate);
@@ -57,6 +73,7 @@ export class LicitationsService {
       // Create and save licitation first
       const licitation = this.licitationRepository.create({
         ...licitationData,
+        internalNumber: internalNumber?.trim() || (await this.nextInternalNumber()),
         startDate: start,
         deadlineDate: deadline,
         client,

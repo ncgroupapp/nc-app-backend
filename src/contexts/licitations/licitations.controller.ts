@@ -51,6 +51,12 @@ export class LicitationsController {
     return this.licitationsService.create(createLicitationDto);
   }
 
+  @Get("next-internal-number")
+  @ApiOperation({ summary: "Next correlative internal number (NC-<year>-<nnn>)" })
+  async getNextInternalNumber(): Promise<{ internalNumber: string }> {
+    return { internalNumber: await this.licitationsService.nextInternalNumber() };
+  }
+
   @Get()
   @ApiOperation({ summary: "Get all licitations" })
   @ApiResponse({
