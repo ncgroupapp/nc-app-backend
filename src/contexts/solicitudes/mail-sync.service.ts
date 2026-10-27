@@ -157,7 +157,8 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
       this.accessTokens.set(account.id, { token: tokens.access_token, expiresAt: Date.now() + (tokens.expires_in - 60) * 1000 });
       this.skipCycles.delete(account.id);
       this.logger.log(`Mail account connected: ${email}`);
-      void this.syncAccount(account.id);
+      // First import right away; failures are already recorded on the account
+      void this.syncAccount(account.id).catch(() => undefined);
       return back("conectado", email);
     } catch (error) {
       this.logger.error(`OAuth callback failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -214,7 +215,11 @@ export class MailSyncService implements OnModuleInit, OnModuleDestroy {
           this.skipCycles.set(account.id, skip - 1);
           continue;
         }
-        await this.syncAccount(account.id);
+        try {
+          await this.syncAccount(account.id);
+        } catch {
+          // Recorded on the account by syncAccount; keep going with the other mailboxes
+        }
       }
     } catch (error) {
       this.logger.error(`Mail sync failed: ${error instanceof Error ? error.message : String(error)}`);

@@ -11,7 +11,9 @@ export class LoggerMiddleware implements NestMiddleware {
     res: FastifyReply | ServerResponse,
     next: () => void
   ) {
-    const { method, url } = req;
+    const { method } = req;
+    // Never log OAuth codes or signed state from the Google callback
+    const url = req.url.replace(/([?&](?:code|state)=)[^&]*/g, "$1[redacted]");
     const userAgent = req.headers["user-agent"] || "";
 
     // Type guard to check if response is FastifyReply
