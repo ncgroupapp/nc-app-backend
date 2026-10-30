@@ -10,6 +10,11 @@ import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 import { FilterProductsDto } from './dto/filter-products.dto';
 
+const PRODUCT_CODE_PREFIX = "NC-";
+/** Typing "CORRELATIVO" (or "código correlativo") as the code asks for the next correlative one */
+const CORRELATIVE_KEYWORD = /^\s*(c[oó]digo\s+)?correlativo\s*$/i;
+export const wantsCorrelativeCode = (code?: string | null) => CORRELATIVE_KEYWORD.test(code ?? "");
+
 @Injectable()
 export class ProductsService {
   private readonly logger = new Logger(ProductsService.name);
@@ -21,13 +26,36 @@ export class ProductsService {
     private readonly providerRepository: Repository<Provider>,
   ) {}
 
+  /**
+   * Next correlative product code: "NC-" plus the highest number already used + 1, 4 digits
+   * (NC-0001, NC-0002…). Codes with other formats are ignored.
+   */
+  async nextCode(): Promise<string> {
+    const [row] = await this.productRepository.query(
+      `SELECT COALESCE(MAX(CAST(substring(code FROM '^NC-(\\d+)$') AS integer)), 0) AS last FROM products`,
+    );
+    return `${PRODUCT_CODE_PREFIX}${String(Number(row?.last ?? 0) + 1).padStart(4, "0")}`;
+  }
+
   async create(createProductDto: CreateProductDto): Promise<Product> {
     this.logger.log(`Creating product: ${createProductDto.name}`);
     const { providerIds, ...productData } = createProductDto;
+    const autoCode = wantsCorrelativeCode(productData.code);
 
     try {
       const product = this.productRepository.create(productData);
-      const savedProduct = await this.productRepository.save(product);
+      let savedProduct: Product | undefined;
+      // "CORRELATIVO" gets the next correlative code; if two products take the same number at the
+      // same time, the unique index rejects one and it tries the next
+      for (let attempt = 0; !savedProduct; attempt++) {
+        if (autoCode) product.code = await this.nextCode();
+        try {
+          savedProduct = await this.productRepository.save(product);
+        } catch (error) {
+          const duplicated = (error as { code?: string }).code === "23505";
+          if (!autoCode || !duplicated || attempt >= 4) throw error;
+        }
+      }
 
       if (providerIds && providerIds.length > 0) {
         await this.assignProvidersToProduct(savedProduct, providerIds);
@@ -172,6 +200,7 @@ export class ProductsService {
 
     try {
       const { providerIds, ...updateData } = updateProductDto;
+      if (wantsCorrelativeCode(updateData.code)) updateData.code = await this.nextCode();
 
       Object.assign(product, updateData);
 

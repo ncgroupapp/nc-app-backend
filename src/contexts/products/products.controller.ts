@@ -35,6 +35,12 @@ export class ProductsController {
 
 
 
+  @Get('next-code')
+  @ApiOperation({ summary: 'Next correlative product code (NC-0001, NC-0002…)' })
+  async nextCode(): Promise<{ code: string }> {
+    return { code: await this.productsService.nextCode() };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a product by ID' })
   @ApiResponse({ status: 200, description: 'Product found', type: Product })
