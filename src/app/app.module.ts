@@ -23,6 +23,7 @@ import { StockModule } from "../contexts/stock/stock.module";
 import { SolicitudesModule } from "../contexts/solicitudes/solicitudes.module";
 import { ProfitabilityModule } from "../contexts/profitability/profitability.module";
 import { RemitosModule } from "../contexts/remitos/remitos.module";
+import { DashboardModule } from "../contexts/dashboard/dashboard.module";
 
 import { AuthMiddleware } from "@/src/contexts/auth/middlewares/auth.middleware";
 import { LoggerMiddleware } from "@/shared/logger/logger.middleware";
@@ -51,6 +52,7 @@ import { CorrelationIdMiddleware } from "@/shared/middlewares/correlation-id.mid
     SolicitudesModule,
     ProfitabilityModule,
     RemitosModule,
+    DashboardModule,
   ],
 })
 export class AppModule implements NestModule {
