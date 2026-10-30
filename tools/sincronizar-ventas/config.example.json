@@ -1,0 +1,6 @@
+{
+  "apiUrl": "https://URL-DEL-BACKEND",
+  "token": "EL-MISMO-VALOR-QUE-BILLING_SYNC_TOKEN-EN-EL-SERVIDOR",
+  "folder": "C:\\Users\\USUARIO\\Documents\\Ventas NC GROUP",
+  "intervalSeconds": 30
+}

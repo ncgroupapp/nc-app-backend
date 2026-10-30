@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { LicitationStatus } from "../licitations/entities/licitation.entity";
 import { QuotationStatus } from "../quotation/entities/quotation.entity";
+import { CertificateStatus, certificateStatus } from "../certificates/certificate-status";
 
 /** Licitation deadlines are stored as Uruguay wall-clock time (timestamp without time zone). */
 const TIME_ZONE = "America/Montevideo";
@@ -48,15 +49,29 @@ export interface UnfinishedQuotation {
   overdue: boolean;
 }
 
+export interface CertificateAlert {
+  id: number;
+  name: string;
+  requiredForRupe: boolean;
+  /** YYYY-MM-DD, null when it was never loaded. */
+  expiryDate: string | null;
+  status: Exclude<CertificateStatus, "vigente">;
+  daysLeft: number | null;
+}
+
 export interface DashboardAlerts {
   /** YYYY-MM-DD in Uruguay. */
   today: string;
   closingToday: ClosingLicitation[];
   unfinishedQuotations: UnfinishedQuotation[];
+  /** Expired, about to expire, or RUPE certificates never loaded. */
+  certificates: CertificateAlert[];
 }
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(private readonly dataSource: DataSource) {}
 
   async getAlerts(): Promise<DashboardAlerts> {
@@ -94,6 +109,7 @@ export class DashboardService {
       ),
     ]);
 
+    const certificates = await this.findCertificateAlerts(today);
     const ids: number[] = closing.map((l: ClosingLicitation) => l.id);
     const missing = ids.length ? await this.findMissingOffers(ids) : [];
 
@@ -106,7 +122,31 @@ export class DashboardService {
           .map(({ licitationId: _licitationId, ...product }) => product),
       })),
       unfinishedQuotations: unfinished,
+      certificates,
     };
+  }
+
+  /** Certificates that need attention today: the check runs every time the dashboard refreshes. */
+  private async findCertificateAlerts(today: string): Promise<CertificateAlert[]> {
+    try {
+      const rows: Array<{ id: number; name: string; requiredForRupe: boolean; expiryDate: string | null; alertDays: number }> =
+        await this.dataSource.query(
+          `SELECT id, name, "requiredForRupe", to_char("expiryDate", 'YYYY-MM-DD') AS "expiryDate", "alertDays"
+             FROM certificates
+            WHERE ("expiryDate" IS NULL AND "requiredForRupe")
+               OR "expiryDate" <= $1::date + "alertDays"
+            ORDER BY "expiryDate" ASC NULLS LAST, name`,
+          [today],
+        );
+      return rows.map(({ alertDays, ...row }) => ({
+        ...row,
+        ...(certificateStatus(row.expiryDate, alertDays, today) as { status: CertificateAlert["status"]; daysLeft: number | null }),
+      }));
+    } catch (error) {
+      // The certificates table is created on startup; never break the other alerts because of it
+      this.logger.error("Could not load certificate alerts", error instanceof Error ? error.stack : String(error));
+      return [];
+    }
   }
 
   /** Products of the given licitations (listed in the call or in its quotations) that have no offer at all. */

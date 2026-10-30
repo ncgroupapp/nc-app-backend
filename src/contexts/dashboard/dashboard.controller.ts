@@ -10,7 +10,7 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get("alerts")
-  @ApiOperation({ summary: "Alertas del día: compras que cierran hoy, productos sin oferta y cotizaciones sin finalizar" })
+  @ApiOperation({ summary: "Alertas del día: compras que cierran hoy, productos sin oferta, cotizaciones sin finalizar y certificados por vencer" })
   getAlerts(): Promise<DashboardAlerts> {
     return this.dashboardService.getAlerts();
   }

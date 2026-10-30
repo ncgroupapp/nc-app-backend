@@ -24,6 +24,8 @@ import { SolicitudesModule } from "../contexts/solicitudes/solicitudes.module";
 import { ProfitabilityModule } from "../contexts/profitability/profitability.module";
 import { RemitosModule } from "../contexts/remitos/remitos.module";
 import { DashboardModule } from "../contexts/dashboard/dashboard.module";
+import { BillingModule } from "../contexts/billing/billing.module";
+import { CertificatesModule } from "../contexts/certificates/certificates.module";
 
 import { AuthMiddleware } from "@/src/contexts/auth/middlewares/auth.middleware";
 import { LoggerMiddleware } from "@/shared/logger/logger.middleware";
@@ -53,6 +55,8 @@ import { CorrelationIdMiddleware } from "@/shared/middlewares/correlation-id.mid
     ProfitabilityModule,
     RemitosModule,
     DashboardModule,
+    BillingModule,
+    CertificatesModule,
   ],
 })
 export class AppModule implements NestModule {
@@ -66,6 +70,8 @@ export class AppModule implements NestModule {
         { path: "/api/(.*)", method: RequestMethod.GET },
         // Google redirects the browser here after authorizing a mailbox (protected by a signed state)
         { path: "/solicitudes/mail/callback", method: RequestMethod.GET },
+        // The folder agent authenticates with BILLING_SYNC_TOKEN (checked in BillingController)
+        { path: "/billing/sync", method: RequestMethod.POST },
       )
       .forRoutes("*");
 
