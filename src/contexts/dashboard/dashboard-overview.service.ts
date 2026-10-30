@@ -85,6 +85,7 @@ const money = (rows: Array<{ currency: string | null; net: string }>): MoneyByCu
 
 /** Signed amount: credit notes subtract */
 const NET = `CASE WHEN type = 'nota_credito' THEN -ABS(COALESCE(total, 0)) ELSE COALESCE(total, 0) END`;
+const NET_D = NET.replace(/\b(type|total)\b/g, 'd.$1');
 
 @Injectable()
 export class DashboardOverviewService {
@@ -157,20 +158,23 @@ export class DashboardOverviewService {
         [today],
       ),
       this.dataSource.query(
-        `SELECT "clientName" AS name,
-                COALESCE(SUM(${NET}) FILTER (WHERE currency = 'UYU'), 0) AS "UYU",
-                COALESCE(SUM(${NET}) FILTER (WHERE currency = 'USD'), 0) AS "USD",
+        // Documents linked to a client of the app are grouped under that client's name
+        `SELECT COALESCE(c.name, d."clientName") AS name,
+                COALESCE(SUM(${NET_D}) FILTER (WHERE d.currency = 'UYU'), 0) AS "UYU",
+                COALESCE(SUM(${NET_D}) FILTER (WHERE d.currency = 'USD'), 0) AS "USD",
                 COUNT(*)::int AS documents
-           FROM billing_documents
-          WHERE "clientName" IS NOT NULL AND "issueDate" >= date_trunc('year', $1::date)
-          GROUP BY "clientName"
+           FROM billing_documents d
+           LEFT JOIN clients c ON c.id = d."clientId"
+          WHERE COALESCE(c.name, d."clientName") IS NOT NULL AND d."issueDate" >= date_trunc('year', $1::date)
+          GROUP BY COALESCE(c.name, d."clientName")
           ORDER BY 2 DESC, 3 DESC LIMIT 5`,
         [today],
       ),
       this.dataSource.query(
-        `SELECT id, type, series, number, to_char("issueDate", 'YYYY-MM-DD') AS "issueDate",
-                "clientName", currency, total
-           FROM billing_documents ORDER BY "issueDate" DESC NULLS LAST, id DESC LIMIT 5`,
+        `SELECT d.id, d.type, d.series, d.number, to_char(d."issueDate", 'YYYY-MM-DD') AS "issueDate",
+                COALESCE(c.name, d."clientName") AS "clientName", d.currency, d.total
+           FROM billing_documents d LEFT JOIN clients c ON c.id = d."clientId"
+          ORDER BY d."issueDate" DESC NULLS LAST, d.id DESC LIMIT 5`,
       ),
     ]);
     return {

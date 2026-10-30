@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsDateString, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength } from "class-validator";
 import { PaginationDto } from "../../shared/dto/pagination.dto";
 import { BillingDocumentType } from "../entities/billing-document.entity";
 
@@ -50,6 +50,12 @@ export class UpdateBillingDocumentDto {
   @IsString()
   @MaxLength(20)
   clientRut?: string | null;
+
+  /** Client of the app chosen by hand; null unlinks it */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  clientId?: number | null;
 
   @IsOptional()
   @IsIn(["UYU", "USD"])

@@ -29,6 +29,9 @@ export const CREATE_BILLING_DOCUMENTS_TABLE_SQL = `
     "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
   );
   ALTER TABLE "billing_documents" ADD COLUMN IF NOT EXISTS "rawText" text;
+  ALTER TABLE "billing_documents" ADD COLUMN IF NOT EXISTS "clientId" integer NULL REFERENCES "clients"("id") ON DELETE SET NULL;
+  ALTER TABLE "billing_documents" ADD COLUMN IF NOT EXISTS "clientMatch" character varying(10);
+  CREATE INDEX IF NOT EXISTS "IDX_billing_documents_clientId" ON "billing_documents" ("clientId");
   CREATE UNIQUE INDEX IF NOT EXISTS "UQ_billing_documents_fileHash" ON "billing_documents" ("fileHash");
   CREATE INDEX IF NOT EXISTS "IDX_billing_documents_issueDate" ON "billing_documents" ("issueDate");
   CREATE INDEX IF NOT EXISTS "IDX_billing_documents_type" ON "billing_documents" ("type");

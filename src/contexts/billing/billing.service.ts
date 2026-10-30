@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleIni
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Brackets, DataSource, Repository, SelectQueryBuilder } from "typeorm";
+import { MatchableClient, matchClient } from "./client-matcher";
 import { readPdf } from "./pdf-reader";
 import { CREATE_BILLING_DOCUMENTS_TABLE_SQL } from "./billing-documents.table";
 import {
@@ -109,6 +110,7 @@ export class BillingService implements OnModuleInit {
     const saved = await this.repository.save(
       this.repository.create({
         ...parsed,
+        ...this.linkClient(parsed, await this.loadClients()),
         rawText,
         source,
         fileName: fileName.slice(0, 255),
@@ -130,7 +132,7 @@ export class BillingService implements OnModuleInit {
    */
   async reprocess(
     ids?: number[],
-  ): Promise<{ processed: number; fixed: number; stillNeedReview: number; duplicates: number }> {
+  ): Promise<{ processed: number; fixed: number; stillNeedReview: number; duplicates: number; linkedClients: number }> {
     const query = this.repository
       .createQueryBuilder("doc")
       .addSelect("doc.fileData")
@@ -148,6 +150,11 @@ export class BillingService implements OnModuleInit {
           if (key === "needsReview") continue;
           if (value !== null && value !== undefined) (updates as Record<string, unknown>)[key] = value;
         }
+        if (document.clientMatch !== "manual" && (updates.clientName || updates.clientRut)) {
+          const link = this.linkClient({ ...document, ...updates }, await this.loadClients());
+          // Keep an existing link when the new data matches no client
+          if (link.clientId) Object.assign(updates, link);
+        }
         const merged = { ...document, ...updates };
         updates.needsReview = !merged.number || !merged.issueDate || merged.total === null;
         if (document.needsReview && !updates.needsReview) fixed++;
@@ -156,6 +163,7 @@ export class BillingService implements OnModuleInit {
         this.logger.warn(`Could not re-read document ${document.id}: ${error instanceof Error ? error.message : error}`);
       }
     }
+    const linkedClients = await this.linkUnlinkedClients();
     const stillNeedReview = await this.repository.count({ where: { needsReview: true } });
     // Files that had no readable number could be the same document uploaded twice (PDF and XML, re-downloads)
     const [{ duplicates }] = await this.dataSource.query(
@@ -164,7 +172,37 @@ export class BillingService implements OnModuleInit {
           GROUP BY type, series, number HAVING count(*) > 1
        ) repeated`,
     );
-    return { processed: documents.length, fixed, stillNeedReview, duplicates };
+    return { processed: documents.length, fixed, stillNeedReview, duplicates, linkedClients };
+  }
+
+  /** Links to a client of the app every document that has none yet (e.g. after loading new clients) */
+  async linkUnlinkedClients(): Promise<number> {
+    const clients = await this.loadClients();
+    if (clients.length === 0) return 0;
+    const documents: Array<{ id: number; clientName: string | null; clientRut: string | null }> = await this.dataSource.query(
+      `SELECT id, "clientName", "clientRut" FROM billing_documents
+        WHERE "clientId" IS NULL AND ("clientName" IS NOT NULL OR "clientRut" IS NOT NULL)`,
+    );
+    let linked = 0;
+    for (const document of documents) {
+      const link = this.linkClient(document, clients);
+      if (!link.clientId) continue;
+      await this.repository.update(document.id, link);
+      linked++;
+    }
+    return linked;
+  }
+
+  private async loadClients(): Promise<MatchableClient[]> {
+    return this.dataSource.query(`SELECT id, name, identifier FROM clients`);
+  }
+
+  private linkClient(
+    document: { clientName?: string | null; clientRut?: string | null },
+    clients: readonly MatchableClient[],
+  ): Pick<BillingDocument, "clientId" | "clientMatch"> {
+    const match = matchClient(document, clients);
+    return { clientId: match?.clientId ?? null, clientMatch: match?.by ?? null };
   }
 
   /** Text read from the file, to check why a document could not be understood */
@@ -184,9 +222,11 @@ export class BillingService implements OnModuleInit {
     const limit = Math.min(filters.limit ?? 20, 200);
 
     const query = this.applyFilters(this.repository.createQueryBuilder("doc"), filters, true)
+      .addSelect(["client.id", "client.name", "client.identifier"])
       .addSelect(NUMBER_SQL, "number_value")
-      .skip((page - 1) * limit)
-      .take(limit);
+      // offset/limit instead of skip/take: the join is many-to-one, so rows are not multiplied
+      .offset((page - 1) * limit)
+      .limit(limit);
     const sort = filters.sort ?? "numero_desc";
     if (sort === "fecha_desc") {
       query.orderBy("doc.issueDate", "DESC", "NULLS LAST").addOrderBy("number_value", "DESC", "NULLS LAST");
@@ -268,7 +308,12 @@ export class BillingService implements OnModuleInit {
   }
 
   async findOne(id: number): Promise<BillingDocument> {
-    const document = await this.repository.findOne({ where: { id } });
+    const document = await this.repository
+      .createQueryBuilder("doc")
+      .leftJoin("doc.client", "client")
+      .addSelect(["client.id", "client.name", "client.identifier"])
+      .where("doc.id = :id", { id })
+      .getOne();
     if (!document) throw new NotFoundException(`Documento ${id} no encontrado`);
     return document;
   }
@@ -288,8 +333,16 @@ export class BillingService implements OnModuleInit {
     const document = await this.findOne(id);
     if (Object.keys(dto).length === 0) throw new BadRequestException("No hay cambios para guardar");
     Object.assign(document, dto);
+    if (dto.clientId !== undefined) {
+      document.clientMatch = dto.clientId ? "manual" : null;
+    } else if (document.clientMatch !== "manual" && (dto.clientName !== undefined || dto.clientRut !== undefined)) {
+      Object.assign(document, this.linkClient(document, await this.loadClients()));
+    }
     document.needsReview = !document.number || !document.issueDate || document.total === null;
-    return this.repository.save(document);
+    // Drop the loaded relation so the new clientId is what gets saved
+    delete document.client;
+    await this.repository.save(document);
+    return this.findOne(id);
   }
 
   async remove(id: number): Promise<void> {
@@ -313,7 +366,9 @@ export class BillingService implements OnModuleInit {
     filters: FilterBillingDocumentsDto,
     includeType: boolean,
   ): SelectQueryBuilder<BillingDocument> {
+    query.leftJoin("doc.client", "client");
     if (includeType && filters.type) query.andWhere("doc.type = :type", { type: filters.type });
+    if (filters.clientId) query.andWhere("doc.clientId = :clientId", { clientId: filters.clientId });
     if (filters.currency) query.andWhere("doc.currency = :currency", { currency: filters.currency });
     if (filters.dateFrom) query.andWhere("doc.issueDate >= :dateFrom", { dateFrom: filters.dateFrom });
     if (filters.dateTo) query.andWhere("doc.issueDate <= :dateTo", { dateTo: filters.dateTo });
@@ -323,6 +378,7 @@ export class BillingService implements OnModuleInit {
       query.andWhere(
         new Brackets((qb) => {
           qb.where("doc.clientName ILIKE :search", { search: `%${search}%` })
+            .orWhere("client.name ILIKE :search")
             .orWhere("doc.clientRut ILIKE :search")
             .orWhere("doc.fileName ILIKE :search")
             .orWhere("doc.referenceNumber ILIKE :search")

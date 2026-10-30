@@ -1,9 +1,13 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Relation, UpdateDateColumn } from "typeorm";
+import { Client } from "../../clients/entities/client.entity";
 
 export enum BillingDocumentType {
   INVOICE = "factura",
   CREDIT_NOTE = "nota_credito",
 }
+
+/** How the document was linked to a client of the app */
+export type BillingClientMatch = "rut" | "nombre" | "manual";
 
 export enum BillingDocumentSource {
   /** Uploaded by the folder agent watching "Ventas NC GROUP" */
@@ -47,6 +51,17 @@ export class BillingDocument {
 
   @Column({ type: "varchar", length: 20, nullable: true })
   clientRut!: string | null;
+
+  /** Client of the app this document belongs to, found by RUT or name, or chosen by hand */
+  @Column({ type: "int", nullable: true })
+  clientId!: number | null;
+
+  @ManyToOne(() => Client, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "clientId" })
+  client?: Relation<Client> | null;
+
+  @Column({ type: "varchar", length: 10, nullable: true })
+  clientMatch!: BillingClientMatch | null;
 
   @Column({ type: "varchar", length: 3, nullable: true })
   currency!: string | null;
