@@ -38,7 +38,10 @@ export class QuotationPdfService implements OnModuleInit {
    * @returns Promise<Buffer> - Buffer del PDF generado
    */
   async generatePdf(quotation: Quotation): Promise<Buffer> {
-    const observationImages = await this.loadObservationImages(quotation);
+    const [observationImages, clientLogo] = await Promise.all([
+      this.loadObservationImages(quotation),
+      this.loadClientLogo(quotation),
+    ]);
 
     return new Promise((resolve, reject) => {
       try {
@@ -65,6 +68,7 @@ export class QuotationPdfService implements OnModuleInit {
         renderQuotationPdf(doc, quotation, {
           logo: this.loadAsset('logo.png'),
           signature: this.loadAsset('firma.png'),
+          clientLogo,
           observationImages,
         });
 
@@ -111,6 +115,22 @@ export class QuotationPdfService implements OnModuleInit {
       }),
     );
     return loaded.filter((image): image is ObservationImageAsset => image !== null);
+  }
+
+  /** Logo of the quotation's client (from its licitation, or the quotation itself); null when it has none. */
+  private async loadClientLogo(quotation: Quotation): Promise<Buffer | null> {
+    const clientId = quotation.licitation?.client?.id ?? quotation.licitation?.clientId ?? quotation.clientId;
+    if (!clientId) return null;
+    try {
+      const rows: Array<{ logoData: Buffer | null }> = await this.dataSource.query(
+        'SELECT "logoData" FROM "clients" WHERE "id" = $1',
+        [clientId],
+      );
+      return rows[0]?.logoData ?? null;
+    } catch (error) {
+      this.logger.warn(`Client logo not loaded: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
   }
 
   private loadAsset(fileName: string): Buffer | null {

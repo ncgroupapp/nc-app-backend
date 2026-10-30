@@ -13,6 +13,12 @@ const SOFT = "#F3F6FA";
 const HEADER_SUB = "#B9D4EE";
 
 const MARGIN = 36;
+/** Largest size of the client logo, kept in proportion (wide or square logos alike). */
+const CLIENT_LOGO_BOX = { width: 150, height: 54 };
+/** Space between the client logo and the client's name */
+const CLIENT_LOGO_GAP = 14;
+/** Area (pt²) every client logo is sized to, so all shapes have the same visual weight. */
+const CLIENT_LOGO_AREA = 3300;
 const TIME_ZONE = "America/Montevideo";
 
 const CURRENCY_NAMES: Record<string, string> = {
@@ -40,6 +46,8 @@ export interface ObservationImageAsset {
 
 export interface QuotationPdfAssets {
   logo?: Buffer | null;
+  /** Client's logo (PNG or JPG), drawn next to the client's data. */
+  clientLogo?: Buffer | null;
   signature?: Buffer | null;
   /** Product images drawn under the observations, already downloaded. */
   observationImages?: ObservationImageAsset[];
@@ -147,6 +155,34 @@ function drawTableHeader(doc: PDFKit.PDFDocument, y: number): number {
 }
 
 /**
+ * Size of the client logo: same visual weight for any shape (a wide wordmark and a round seal look
+ * equally big), never larger than CLIENT_LOGO_BOX and never distorted.
+ */
+export function clientLogoSize(imageWidth: number, imageHeight: number): { width: number; height: number } {
+  const ratio = imageWidth / imageHeight;
+  let width = Math.sqrt(CLIENT_LOGO_AREA * ratio);
+  let height = width / ratio;
+  const scale = Math.min(1, CLIENT_LOGO_BOX.width / width, CLIENT_LOGO_BOX.height / height);
+  width *= scale;
+  height *= scale;
+  return { width, height };
+}
+
+type PdfImage = { width: number; height: number };
+
+/** The client logo ready to draw, or null when it is missing or not a readable PNG/JPG. */
+function openClientLogo(doc: PDFKit.PDFDocument, logo: Buffer | null | undefined): { image: PdfImage; width: number; height: number } | null {
+  if (!logo) return null;
+  try {
+    const image = (doc as unknown as { openImage: (src: Buffer) => PdfImage }).openImage(logo);
+    return { image, ...clientLogoSize(image.width, image.height) };
+  } catch {
+    // An unreadable image must never break the quotation
+    return null;
+  }
+}
+
+/**
  * Dibuja la cotización completa sobre el documento.
  * Separado del servicio para poder probar el diseño sin levantar NestJS.
  */
@@ -179,22 +215,43 @@ export function renderQuotationPdf(doc: PDFKit.PDFDocument, quotation: Quotation
   gradientBar(doc, MARGIN, 124, contentWidth, 3.5);
 
   // === CLIENTE ===
+  // "SEÑORES" always on the left margin; under it, the client logo with the client's data beside it
   let y = 142;
   doc.font("Helvetica-Bold").fontSize(7).fillColor(BLUE)
     .text("SEÑORES", MARGIN, y, { characterSpacing: 1.2 });
-  y += 11;
-  doc.font("Helvetica-Bold").fontSize(11).fillColor(NAVY)
-    .text(client?.name || quotation.clientName || "-", MARGIN, y, { width: contentWidth });
-  y = doc.y + 2;
+  y += 13;
+  const clientTop = y;
+  const clientLogo = openClientLogo(doc, assets.clientLogo);
+  const clientX = clientLogo ? MARGIN + clientLogo.width + CLIENT_LOGO_GAP : MARGIN;
+  const clientTextWidth = right - clientX;
+  const clientName = client?.name || quotation.clientName || "-";
   const clientLines = [
     client?.identifier ? `RUT ${client.identifier}` : null,
     client?.contacts?.find(c => c.address)?.address || null,
   ].filter((line): line is string => Boolean(line));
+
+  // Logo and client data are centered on each other, whichever is taller
+  doc.font("Helvetica-Bold").fontSize(11);
+  let textHeight = doc.heightOfString(clientName, { width: clientTextWidth }) + 2;
+  doc.font("Helvetica").fontSize(9);
+  for (const line of clientLines) textHeight += doc.heightOfString(line, { width: clientTextWidth }) + 1;
+  const clientBlockHeight = Math.max(textHeight, clientLogo?.height ?? 0);
+
+  y = clientTop + (clientBlockHeight - textHeight) / 2;
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(NAVY).text(clientName, clientX, y, { width: clientTextWidth });
+  y = doc.y + 2;
   doc.font("Helvetica").fontSize(9).fillColor(MUTED);
   for (const line of clientLines) {
-    doc.text(line, MARGIN, y, { width: contentWidth });
+    doc.text(line, clientX, y, { width: clientTextWidth });
     y = doc.y + 1;
   }
+  if (clientLogo) {
+    doc.image(clientLogo.image as unknown as Buffer, MARGIN, clientTop + (clientBlockHeight - clientLogo.height) / 2, {
+      width: clientLogo.width,
+      height: clientLogo.height,
+    });
+  }
+  y = clientTop + clientBlockHeight;
 
   // === SALUDO ===
   y += 14;

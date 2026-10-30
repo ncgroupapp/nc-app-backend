@@ -27,6 +27,17 @@ export class Client {
   @Column({ type: "jsonb" })
   contacts!: Contact[];
 
+  /** Logo shown on the quotation sheet (PNG or JPG). Not loaded unless asked for. */
+  @Column({ type: "bytea", nullable: true, select: false })
+  logoData?: Buffer | null;
+
+  @Column({ type: "varchar", length: 50, nullable: true })
+  logoMimeType?: string | null;
+
+  /** When the logo was last changed; null when the client has no logo */
+  @Column({ type: "timestamp", nullable: true })
+  logoUpdatedAt?: Date | null;
+
   @CreateDateColumn()
   createdAt!: Date;
 

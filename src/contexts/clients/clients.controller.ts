@@ -12,14 +12,19 @@ import {
   Query,
   Logger,
   UseInterceptors,
+  BadRequestException,
+  Req,
+  Res,
 } from "@nestjs/common";
+import type { MultipartFile } from "@fastify/multipart";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiQuery,
 } from "@nestjs/swagger";
-import { ClientsService } from "./clients.service";
+import { ClientsService, MAX_CLIENT_LOGO_BYTES } from "./clients.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
 import { Client } from "./entities/client.entity";
@@ -34,6 +39,38 @@ export class ClientsController {
   private readonly logger = new Logger(ClientsController.name);
 
   constructor(private readonly clientsService: ClientsService) {}
+
+  @Get(":id/logo")
+  @ApiOperation({ summary: "Logo del cliente (PNG o JPG)" })
+  async getLogo(@Param("id", ParseIntPipe) id: number, @Res({ passthrough: true }) reply: FastifyReply) {
+    const logo = await this.clientsService.getLogo(id);
+    reply.header("Content-Type", logo.mimeType);
+    reply.header("Cache-Control", "private, max-age=86400");
+    reply.send(logo.data);
+  }
+
+  @Post(":id/logo")
+  @ApiOperation({ summary: "Subir o reemplazar el logo del cliente (PNG o JPG, hasta 2 MB)" })
+  async uploadLogo(@Param("id", ParseIntPipe) id: number, @Req() req: FastifyRequest) {
+    const request = req as FastifyRequest & {
+      isMultipart?: () => boolean;
+      file: (options?: { limits?: { fileSize?: number } }) => Promise<MultipartFile | undefined>;
+    };
+    if (typeof request.isMultipart !== "function" || !request.isMultipart()) {
+      throw new BadRequestException("Enviá el logo como multipart/form-data");
+    }
+    const part = await request.file({ limits: { fileSize: MAX_CLIENT_LOGO_BYTES } });
+    if (!part) throw new BadRequestException("No se recibió ningún archivo");
+    const data = await part.toBuffer();
+    if (part.file.truncated) throw new BadRequestException("El logo no puede superar los 2 MB");
+    return this.clientsService.setLogo(id, data);
+  }
+
+  @Delete(":id/logo")
+  @ApiOperation({ summary: "Quitar el logo del cliente" })
+  removeLogo(@Param("id", ParseIntPipe) id: number) {
+    return this.clientsService.removeLogo(id);
+  }
 
   @Post()
   @ApiOperation({ summary: "Create a new client" })
