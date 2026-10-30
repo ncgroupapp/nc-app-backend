@@ -1,4 +1,5 @@
 import { BillingDocumentType } from "./entities/billing-document.entity";
+import type { PdfCell } from "./pdf-reader";
 
 /**
  * Reads the data of an invoice / credit note from the files the billing system (Z) exports.
@@ -151,11 +152,131 @@ const detectPdfCfeType = (upper: string, creditNote: boolean): number | null => 
   return null;
 };
 
+const DATE = String.raw`\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}-\d{2}-\d{2}`;
+
+/**
+ * Value of a field in a "label / value" layout: the rest of the label's own cell, the cell to its
+ * right on the same line, or the cell right below it (DGI invoices print the header as boxes with the
+ * label on top). Returns the first match of `value` that is found.
+ */
+function valueNear(cells: PdfCell[], label: RegExp, value: RegExp): RegExpMatchArray | null {
+  for (const cell of cells) {
+    const text = normalize(cell.text);
+    const labelMatch = text.match(label);
+    if (!labelMatch) continue;
+
+    const rest = text.slice((labelMatch.index ?? 0) + labelMatch[0].length).replace(/^[\s:.-]+/, "");
+    const inline = rest.match(value);
+    if (inline) return inline;
+
+    const sameLine = cells
+      .filter((other) => other.page === cell.page && Math.abs(other.y - cell.y) < 3 && other.x > cell.x)
+      .sort((a, b) => a.x - b.x);
+    const right = sameLine[0] && normalize(sameLine[0].text).match(value);
+    if (right) return right;
+
+    // Below: closest line under the label whose cell overlaps the label horizontally
+    const below = cells
+      .filter(
+        (other) =>
+          other.page === cell.page &&
+          other.y < cell.y - 2 &&
+          cell.y - other.y < 45 &&
+          other.x < cell.right + 15 &&
+          other.right > cell.x - 15,
+      )
+      .sort((a, b) => b.y - a.y || Math.abs(a.x - cell.x) - Math.abs(b.x - cell.x));
+    for (const candidate of below.slice(0, 3)) {
+      const match = normalize(candidate.text).match(value);
+      if (match) return match;
+    }
+  }
+  return null;
+}
+
+interface LayoutFields {
+  series?: string;
+  number?: string;
+  issueDate?: string | null;
+  clientRut?: string;
+  clientName?: string;
+  currency?: string;
+  total?: number | null;
+}
+
+function readLayout(cells: PdfCell[]): LayoutFields {
+  if (cells.length === 0) return {};
+  const fields: LayoutFields = {};
+
+  const both = valueNear(cells, /SERIE\s*[-/Y]?\s*N(?:RO|UMERO|º|°)/, /\b([A-Z]{1,2})\s*[-/]?\s*(\d{1,10})\b/);
+  if (both) {
+    fields.series = both[1];
+    fields.number = both[2];
+  } else {
+    const series = valueNear(cells, /^SERIE\b/, /^([A-Z]{1,2})\b/);
+    const number = valueNear(cells, /^(?:N(?:RO|UMERO|º|°|O)\.?(?:\s+(?:DE\s+)?(?:CFE|DOCUMENTO|COMPROBANTE))?)\s*:?$/, /^(\d{1,10})\b/);
+    if (series) fields.series = series[1];
+    if (number) fields.number = number[1];
+  }
+
+  const date = valueNear(cells, /FECHA(?:\s+DE)?(?:\s+(?:EMISION|COMPROBANTE|DOCUMENTO))?(?!\s+(?:DE\s+)?VENC)/, new RegExp(`(${DATE})`));
+  if (date) fields.issueDate = parseDate(date[1]);
+
+  const rut = valueNear(
+    cells,
+    /(?:RU[CT]|DOC(?:UMENTO)?\.?)\s*(?:DEL\s+)?(?:COMPRADOR|RECEPTOR|CLIENTE)|^RU[CT]\s+(?:COMPRADOR|RECEPTOR)/,
+    /(\d[\d.\s-]{10,16}\d)/,
+  );
+  const rutDigits = rut?.[1].replace(/\D/g, "");
+  if (rutDigits && rutDigits.length === 12) fields.clientRut = rutDigits;
+
+  const name = cells.length
+    ? (() => {
+        for (const cell of cells) {
+          const text = normalize(cell.text);
+          const label = text.match(/^(?:NOMBRE|DENOMINACION|RAZON\s+SOCIAL)(?:\s+O\s+(?:DENOMINACION|RAZON\s+SOCIAL))?(?:\s+(?:DEL\s+)?(?:COMPRADOR|RECEPTOR|CLIENTE))?\s*:?\s*|^(?:CLIENTE|RECEPTOR|COMPRADOR)\s*:?\s*$/);
+          if (!label) continue;
+          const inline = cell.text.slice(label[0].length).trim();
+          if (inline && /[A-Za-z]/.test(inline)) return inline;
+          const right = cells
+            .filter((other) => other.page === cell.page && Math.abs(other.y - cell.y) < 3 && other.x > cell.x)
+            .sort((a, b) => a.x - b.x)[0];
+          if (right && /[A-Za-z]/.test(right.text) && !/RU[CT]/i.test(right.text)) return right.text;
+          const below = cells
+            .filter((other) => other.page === cell.page && other.y < cell.y - 2 && cell.y - other.y < 30 && Math.abs(other.x - cell.x) < 25)
+            .sort((a, b) => b.y - a.y)[0];
+          if (below && /[A-Za-z]/.test(below.text) && !/RU[CT]|FECHA|MONEDA/i.test(below.text)) return below.text;
+        }
+        return undefined;
+      })()
+    : undefined;
+  if (name) fields.clientName = name.slice(0, 255);
+
+  const currency = valueNear(cells, /^MONEDA\b/, /(USD|UYU|U\$S|US\$|DOLAR|PESO|\$)/);
+  if (currency) fields.currency = /USD|U\$S|US\$|DOLAR/.test(currency[1]) ? "USD" : "UYU";
+
+  const total = valueNear(
+    cells,
+    /^(?:TOTAL(?:\s+A\s+PAGAR)?|IMPORTE\s+TOTAL|MONTO\s+TOTAL)(?:\s*\(?(?:UYU|USD|U\$S|US\$|\$)\)?)?\s*:?/,
+    new RegExp(`^(?:UYU|USD|U\\$S|US\\$|\\$)?\\s*(${AMOUNT})$`),
+  );
+  if (total) fields.total = parseAmount(total[1]);
+
+  return fields;
+}
+
 /**
  * @param companyRut RUT of NC GROUP (the issuer), so it is not mistaken for the client's
+ * @param cells positioned text of the PDF, to read values printed under or next to their label
  */
-export function parsePdfText(text: string, fileName: string, companyRut?: string | null): ParsedBillingDocument {
+export function parsePdfText(
+  text: string,
+  fileName: string,
+  companyRut?: string | null,
+  cells: PdfCell[] = [],
+): ParsedBillingDocument {
   const upper = normalize(text);
+  const layout = readLayout(cells);
   const upperName = normalize(fileName);
 
   if (/E-REMITO|E-RESGUARDO/.test(upper) && !/E-FACTURA|E-TICKET/.test(upper)) {
@@ -210,15 +331,16 @@ export function parsePdfText(text: string, fileName: string, companyRut?: string
   return finish({
     type: creditNote ? BillingDocumentType.CREDIT_NOTE : BillingDocumentType.INVOICE,
     cfeType: detectPdfCfeType(upper, creditNote),
-    series: seriesNumber?.[1] ?? null,
-    number: seriesNumber?.[2]?.replace(/^0+(?=\d)/, "") ?? null,
-    issueDate: parseDate(dateMatch?.[1]),
-    clientName,
-    clientRut,
-    currency,
+    // Values read from the layout (label above or beside the value) are more precise than the text guesses
+    series: layout.number ? layout.series ?? null : seriesNumber?.[1] ?? null,
+    number: (layout.number ?? seriesNumber?.[2])?.replace(/^0+(?=\d)/, "") ?? null,
+    issueDate: layout.issueDate ?? parseDate(dateMatch?.[1]),
+    clientName: layout.clientName ?? clientName,
+    clientRut: layout.clientRut && layout.clientRut !== ownRut ? layout.clientRut : clientRut,
+    currency: layout.currency ?? currency,
     subtotal,
     tax,
-    total,
+    total: layout.total ?? total,
     referenceNumber,
   });
 }

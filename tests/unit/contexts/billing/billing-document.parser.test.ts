@@ -162,3 +162,70 @@ describe("readPdfText", () => {
     expect((await readPdfText(pdf)).split("\n")).toEqual(["Serie A", "TOTAL A PAGAR 1.220,00"]);
   });
 });
+
+/** A PDF with text at absolute positions (pdfkit: y grows downwards) */
+const makeLayoutPdf = (texts: Array<[string, number, number]>) =>
+  new Promise<Buffer>((resolve) => {
+    const doc = new PDFDocument({ size: "A4" });
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.fontSize(9);
+    texts.forEach(([text, x, y]) => doc.text(text, x, y, { lineBreak: false }));
+    doc.end();
+  });
+
+describe("parsePdfText with the DGI box layout (label on top, value below)", () => {
+  it("reads every field of an e-Factura printed in boxes", async () => {
+    const pdf = await makeLayoutPdf([
+      ["NC GROUP S.A.S.", 40, 40],
+      ["RUC EMISOR", 380, 40],
+      [COMPANY_RUT, 380, 52],
+      ["TIPO DE CFE", 40, 100], ["SERIE", 160, 100], ["NÚMERO", 220, 100], ["FECHA DE EMISIÓN", 300, 100], ["MONEDA", 430, 100],
+      ["e-Factura", 40, 114], ["A", 160, 114], ["0001234", 220, 114], ["29/10/2026", 300, 114], ["UYU", 430, 114],
+      ["RUC COMPRADOR", 40, 150], ["NOMBRE O DENOMINACIÓN", 180, 150],
+      ["21.000000.0017", 40, 164], ["Administración de los Servicios de Salud del Estado", 180, 164],
+      ["Descripción", 40, 220], ["Cant.", 300, 220], ["Precio", 360, 220], ["Importe", 450, 220],
+      ["Guantes de nitrilo talle M", 40, 236], ["100", 300, 236], ["50,00", 360, 236], ["5.000,00", 450, 236],
+      ["Subtotal", 360, 400], ["5.000,00", 450, 400],
+      ["IVA 22%", 360, 414], ["1.100,00", 450, 414],
+      ["TOTAL A PAGAR", 360, 428], ["$ 6.100,00", 450, 428],
+      ["Fecha de vencimiento", 40, 470], ["28/11/2026", 160, 470],
+    ]);
+    const { readPdf } = await import("../../../../src/contexts/billing/pdf-reader");
+    const { text, cells } = await readPdf(pdf);
+    const doc = parsePdfText(text, "CFE.pdf", COMPANY_RUT, cells);
+    expect(doc).toMatchObject({
+      type: "factura",
+      cfeType: 111,
+      series: "A",
+      number: "1234",
+      issueDate: "2026-10-29",
+      clientRut: "210000000017",
+      clientName: "Administración de los Servicios de Salud del Estado",
+      currency: "UYU",
+      total: 6100,
+      needsReview: false,
+    });
+  });
+
+  it("reads a credit note whose header is a single 'Serie - Número' box", async () => {
+    const pdf = await makeLayoutPdf([
+      ["Nota de Crédito de e-Factura", 40, 40],
+      ["Serie - Número", 300, 40], ["B - 0000077", 300, 54],
+      ["Fecha", 420, 40], ["02/10/2026", 420, 54],
+      ["Moneda", 40, 90], ["Dólares", 40, 104],
+      ["Total", 380, 300], ["US$ 450,50", 450, 300],
+    ]);
+    const { readPdf } = await import("../../../../src/contexts/billing/pdf-reader");
+    const { text, cells } = await readPdf(pdf);
+    expect(parsePdfText(text, "x.pdf", COMPANY_RUT, cells)).toMatchObject({
+      type: "nota_credito",
+      series: "B",
+      number: "77",
+      issueDate: "2026-10-02",
+      currency: "USD",
+      total: 450.5,
+    });
+  });
+});

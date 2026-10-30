@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleIni
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Brackets, DataSource, Repository, SelectQueryBuilder } from "typeorm";
-import { readPdfText } from "./pdf-reader";
+import { readPdf } from "./pdf-reader";
 import { CREATE_BILLING_DOCUMENTS_TABLE_SQL } from "./billing-documents.table";
 import {
   NotABillingDocumentError,
@@ -28,6 +28,17 @@ export type IngestResult =
   | { status: "created"; document: BillingDocument }
   | { status: "duplicate"; document: BillingDocument }
   | { status: "skipped"; fileName: string; reason: string };
+
+export interface BillingNumberGap {
+  type: BillingDocumentType;
+  series: string | null;
+  /** First 50 missing numbers */
+  missing: number[];
+  missingCount: number;
+}
+
+/** Numeric value of the document number ("0001234" → 1234), so 10 sorts after 9 */
+const NUMBER_SQL = `CAST(NULLIF(regexp_replace(doc.number, '\\D', '', 'g'), '') AS bigint)`;
 
 export interface BillingSummaryRow {
   currency: string;
@@ -173,17 +184,61 @@ export class BillingService implements OnModuleInit {
     const limit = Math.min(filters.limit ?? 20, 200);
 
     const query = this.applyFilters(this.repository.createQueryBuilder("doc"), filters, true)
-      .orderBy("doc.issueDate", "DESC", "NULLS LAST")
-      .addOrderBy("doc.id", "DESC")
+      .addSelect(NUMBER_SQL, "number_value")
       .skip((page - 1) * limit)
       .take(limit);
+    const sort = filters.sort ?? "numero_desc";
+    if (sort === "fecha_desc") {
+      query.orderBy("doc.issueDate", "DESC", "NULLS LAST").addOrderBy("number_value", "DESC", "NULLS LAST");
+    } else {
+      const direction = sort === "numero_asc" ? "ASC" : "DESC";
+      // Invoices and credit notes have their own numbering: keep each correlative together
+      query
+        .orderBy("doc.type", "ASC")
+        .addOrderBy("doc.series", direction, "NULLS LAST")
+        .addOrderBy("number_value", direction, "NULLS LAST");
+    }
+    query.addOrderBy("doc.id", "DESC");
     const [data, total] = await query.getManyAndCount();
 
     return {
       data,
       meta: { total, page, limit, lastPage: Math.max(1, Math.ceil(total / limit)) },
       summary: await this.summary(filters),
+      gaps: await this.findGaps(filters),
     };
+  }
+
+  /**
+   * Numbers missing from each correlative (type + series) between the lowest and highest number
+   * found with the current filters, e.g. invoice A 1201 missing between 1200 and 1202.
+   */
+  async findGaps(filters: FilterBillingDocumentsDto): Promise<BillingNumberGap[]> {
+    const ranges = await this.applyFilters(this.repository.createQueryBuilder("doc"), filters, true)
+      .select("doc.type", "type")
+      .addSelect("doc.series", "series")
+      .addSelect(`MIN(${NUMBER_SQL})`, "first")
+      .addSelect(`MAX(${NUMBER_SQL})`, "last")
+      .addSelect(`array_agg(DISTINCT ${NUMBER_SQL})`, "present")
+      .andWhere(`${NUMBER_SQL} IS NOT NULL`)
+      .groupBy("doc.type")
+      .addGroupBy("doc.series")
+      .getRawMany<{ type: BillingDocumentType; series: string | null; first: string; last: string; present: string[] }>();
+
+    const gaps: BillingNumberGap[] = [];
+    for (const range of ranges) {
+      const first = Number(range.first);
+      const last = Number(range.last);
+      // A huge range means a misread number, not thousands of missing invoices
+      if (last - first > 5000) continue;
+      const present = new Set(range.present.map(Number));
+      const missing: number[] = [];
+      for (let n = first + 1; n < last; n++) if (!present.has(n)) missing.push(n);
+      if (missing.length) {
+        gaps.push({ type: range.type, series: range.series, missing: missing.slice(0, 50), missingCount: missing.length });
+      }
+    }
+    return gaps;
   }
 
   /** Totals per currency for the same filters; credit notes are subtracted in "net" */
@@ -247,8 +302,8 @@ export class BillingService implements OnModuleInit {
       const xml = data.toString("utf8");
       return { parsed: parseCfeXml(xml), rawText: xml.slice(0, 20_000) };
     }
-    const text = await readPdfText(data);
-    const parsed = parsePdfText(text, fileName, this.configService.get<string>("BILLING_COMPANY_RUT"));
+    const { text, cells } = await readPdf(data);
+    const parsed = parsePdfText(text, fileName, this.configService.get<string>("BILLING_COMPANY_RUT"), cells);
     if (!text) this.logger.warn(`${fileName}: the PDF has no text (scanned image?)`);
     return { parsed, rawText: text.slice(0, 20_000) };
   }

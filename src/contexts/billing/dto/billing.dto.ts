@@ -3,6 +3,9 @@ import { IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, MaxLength }
 import { PaginationDto } from "../../shared/dto/pagination.dto";
 import { BillingDocumentType } from "../entities/billing-document.entity";
 
+export const BILLING_SORTS = ["numero_desc", "numero_asc", "fecha_desc"] as const;
+export type BillingSort = (typeof BILLING_SORTS)[number];
+
 export class FilterBillingDocumentsDto extends PaginationDto {
   @IsOptional()
   @IsEnum(BillingDocumentType)
@@ -11,6 +14,11 @@ export class FilterBillingDocumentsDto extends PaginationDto {
   @IsOptional()
   @IsIn(["UYU", "USD"])
   currency?: string;
+
+  /** numero_desc (default): correlative, highest number first */
+  @IsOptional()
+  @IsIn(BILLING_SORTS)
+  sort?: BillingSort;
 }
 
 /** Manual corrections for data that could not be read from the file */
