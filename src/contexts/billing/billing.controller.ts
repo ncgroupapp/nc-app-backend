@@ -60,6 +60,13 @@ export class BillingController {
     return this.ingestRequest(req, BillingDocumentSource.MANUAL);
   }
 
+  @Post("reprocess")
+  @ApiOperation({ summary: "Volver a leer los datos de los archivos (por defecto, los marcados para revisar)" })
+  reprocess(@Body() body: { ids?: number[] } = {}) {
+    const ids = Array.isArray(body?.ids) ? body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0) : undefined;
+    return this.billingService.reprocess(ids);
+  }
+
   @Get()
   @ApiOperation({ summary: "Facturas y notas de crédito juntas, con totales por moneda" })
   findAll(@Query() filters: FilterBillingDocumentsDto) {
@@ -73,6 +80,12 @@ export class BillingController {
     reply.header("Content-Type", file.mimeType);
     reply.header("Content-Disposition", `inline; filename="${encodeURIComponent(file.fileName)}"`);
     reply.send(file.fileData);
+  }
+
+  @Get(":id/text")
+  @ApiOperation({ summary: "Texto leído del archivo (para revisar por qué no se entendió)" })
+  rawText(@Param("id", ParseIntPipe) id: number) {
+    return this.billingService.getRawText(id);
   }
 
   @Get(":id")

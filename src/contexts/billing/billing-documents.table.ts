@@ -28,6 +28,7 @@ export const CREATE_BILLING_DOCUMENTS_TABLE_SQL = `
     "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
     "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
   );
+  ALTER TABLE "billing_documents" ADD COLUMN IF NOT EXISTS "rawText" text;
   CREATE UNIQUE INDEX IF NOT EXISTS "UQ_billing_documents_fileHash" ON "billing_documents" ("fileHash");
   CREATE INDEX IF NOT EXISTS "IDX_billing_documents_issueDate" ON "billing_documents" ("issueDate");
   CREATE INDEX IF NOT EXISTS "IDX_billing_documents_type" ON "billing_documents" ("type");

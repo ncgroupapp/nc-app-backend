@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleIni
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Brackets, DataSource, Repository, SelectQueryBuilder } from "typeorm";
-import { pdfToText } from "../solicitudes/pdf-text";
+import { readPdfText } from "./pdf-reader";
 import { CREATE_BILLING_DOCUMENTS_TABLE_SQL } from "./billing-documents.table";
 import {
   NotABillingDocumentError,
@@ -76,10 +76,9 @@ export class BillingService implements OnModuleInit {
     if (sameFile) return { status: "duplicate", document: sameFile };
 
     let parsed: ParsedBillingDocument;
+    let rawText: string;
     try {
-      parsed = isXmlFile(fileName, mimeType)
-        ? parseCfeXml(data.toString("utf8"))
-        : parsePdfText(await pdfToText(data), fileName, this.configService.get<string>("BILLING_COMPANY_RUT"));
+      ({ parsed, rawText } = await this.read(fileName, mimeType, data));
     } catch (error) {
       if (error instanceof NotABillingDocumentError) return { status: "skipped", fileName, reason: error.message };
       throw error;
@@ -99,6 +98,7 @@ export class BillingService implements OnModuleInit {
     const saved = await this.repository.save(
       this.repository.create({
         ...parsed,
+        rawText,
         source,
         fileName: fileName.slice(0, 255),
         mimeType: isXmlFile(fileName, mimeType) ? "application/xml" : "application/pdf",
@@ -108,9 +108,64 @@ export class BillingService implements OnModuleInit {
       }),
     );
     // Never send the file bytes back in JSON responses
-    const { fileData: _fileData, ...document } = saved;
+    const { fileData: _fileData, rawText: _rawText, ...document } = saved;
     this.logger.log(`Stored ${parsed.type} ${parsed.series ?? ""}${parsed.number ?? "?"} from ${fileName}`);
     return { status: "created", document: document as BillingDocument };
+  }
+
+  /**
+   * Reads the data again from the stored files (all documents flagged for review, or the given ones).
+   * Fields corrected by hand are only replaced when the file now gives a value for them.
+   */
+  async reprocess(
+    ids?: number[],
+  ): Promise<{ processed: number; fixed: number; stillNeedReview: number; duplicates: number }> {
+    const query = this.repository
+      .createQueryBuilder("doc")
+      .addSelect("doc.fileData")
+      .orderBy("doc.id", "ASC");
+    if (ids?.length) query.where("doc.id IN (:...ids)", { ids });
+    else query.where("doc.needsReview = true");
+    const documents = await query.getMany();
+
+    let fixed = 0;
+    for (const document of documents) {
+      try {
+        const { parsed, rawText } = await this.read(document.fileName, document.mimeType, document.fileData);
+        const updates: Partial<BillingDocument> = { rawText };
+        for (const [key, value] of Object.entries(parsed) as [keyof ParsedBillingDocument, unknown][]) {
+          if (key === "needsReview") continue;
+          if (value !== null && value !== undefined) (updates as Record<string, unknown>)[key] = value;
+        }
+        const merged = { ...document, ...updates };
+        updates.needsReview = !merged.number || !merged.issueDate || merged.total === null;
+        if (document.needsReview && !updates.needsReview) fixed++;
+        await this.repository.update(document.id, updates);
+      } catch (error) {
+        this.logger.warn(`Could not re-read document ${document.id}: ${error instanceof Error ? error.message : error}`);
+      }
+    }
+    const stillNeedReview = await this.repository.count({ where: { needsReview: true } });
+    // Files that had no readable number could be the same document uploaded twice (PDF and XML, re-downloads)
+    const [{ duplicates }] = await this.dataSource.query(
+      `SELECT COALESCE(SUM(n - 1), 0)::int AS duplicates FROM (
+         SELECT count(*) AS n FROM billing_documents WHERE number IS NOT NULL
+          GROUP BY type, series, number HAVING count(*) > 1
+       ) repeated`,
+    );
+    return { processed: documents.length, fixed, stillNeedReview, duplicates };
+  }
+
+  /** Text read from the file, to check why a document could not be understood */
+  async getRawText(id: number): Promise<{ fileName: string; text: string }> {
+    const document = await this.repository
+      .createQueryBuilder("doc")
+      .select(["doc.id", "doc.fileName"])
+      .addSelect("doc.rawText")
+      .where("doc.id = :id", { id })
+      .getOne();
+    if (!document) throw new NotFoundException(`Documento ${id} no encontrado`);
+    return { fileName: document.fileName, text: document.rawText ?? "" };
   }
 
   async findAll(filters: FilterBillingDocumentsDto) {
@@ -185,6 +240,17 @@ export class BillingService implements OnModuleInit {
   async remove(id: number): Promise<void> {
     const result = await this.repository.delete(id);
     if (!result.affected) throw new NotFoundException(`Documento ${id} no encontrado`);
+  }
+
+  private async read(fileName: string, mimeType: string, data: Buffer) {
+    if (isXmlFile(fileName, mimeType)) {
+      const xml = data.toString("utf8");
+      return { parsed: parseCfeXml(xml), rawText: xml.slice(0, 20_000) };
+    }
+    const text = await readPdfText(data);
+    const parsed = parsePdfText(text, fileName, this.configService.get<string>("BILLING_COMPANY_RUT"));
+    if (!text) this.logger.warn(`${fileName}: the PDF has no text (scanned image?)`);
+    return { parsed, rawText: text.slice(0, 20_000) };
   }
 
   private applyFilters(

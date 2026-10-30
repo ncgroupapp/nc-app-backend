@@ -7,7 +7,7 @@ import {
   parseDate,
   parsePdfText,
 } from "../../../../src/contexts/billing/billing-document.parser";
-import { pdfToText } from "../../../../src/contexts/solicitudes/pdf-text";
+import { readPdfText } from "../../../../src/contexts/billing/pdf-reader";
 
 const COMPANY_RUT = "217654320018";
 
@@ -98,7 +98,7 @@ describe("parsePdfText", () => {
       "IVA Tasa Básica 220,00",
       "TOTAL A PAGAR 1.220,00",
     ]);
-    const doc = parsePdfText(await pdfToText(pdf), "factura.pdf", COMPANY_RUT);
+    const doc = parsePdfText(await readPdfText(pdf), "factura.pdf", COMPANY_RUT);
     expect(doc).toMatchObject({
       type: "factura",
       cfeType: 111,
@@ -134,5 +134,31 @@ describe("parsePdfText", () => {
 
   it("rejects e-Remitos", () => {
     expect(() => parsePdfText("e-Remito\nSerie A Nro 1", "remito.pdf")).toThrow(NotABillingDocumentError);
+  });
+});
+
+describe("readPdfText", () => {
+  it("reads the same PDF every time (pdf-parse 1.1.1 failed at random with 'bad XRef entry')", async () => {
+    const pdf = await makePdf(["e-Factura", "Serie A Nro 0000101", "TOTAL A PAGAR 1.220,00"]);
+    for (let i = 0; i < 5; i++) {
+      const text = await readPdfText(pdf);
+      expect(text).toContain("Serie A Nro 0000101");
+      expect(text).toContain("TOTAL A PAGAR 1.220,00");
+    }
+  });
+
+  it("keeps cells of the same row on one line", async () => {
+    const pdf = await new Promise<Buffer>((resolve) => {
+      const doc = new PDFDocument();
+      const chunks: Buffer[] = [];
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.text("TOTAL A PAGAR", 50, 300, { lineBreak: false });
+      doc.text("1.220,00", 400, 300, { lineBreak: false });
+      doc.text("Serie", 50, 100, { lineBreak: false });
+      doc.text("A", 120, 100, { lineBreak: false });
+      doc.end();
+    });
+    expect((await readPdfText(pdf)).split("\n")).toEqual(["Serie A", "TOTAL A PAGAR 1.220,00"]);
   });
 });
