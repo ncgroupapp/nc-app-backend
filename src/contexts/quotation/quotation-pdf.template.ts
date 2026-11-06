@@ -342,16 +342,12 @@ export function renderQuotationPdf(doc: PDFKit.PDFDocument, quotation: Quotation
   const total = items.reduce((acc, item) => acc + unitPriceWithIva(item) * Number(item.quantity), 0);
   const ivaRates = [...new Set(items.map(item => Number(item.ivaPercentage)))];
   const ivaLabel = ivaRates.length === 1 ? `IVA ${formatAmount(ivaRates[0]).replace(/,00$/, "")}%` : "IVA";
-  const deliveryDays = Math.max(0, ...items.map(item => Number(item.deliveryTime || 0)));
-
+  // The delivery time goes per item in the "ENTREGA" column, not in this box
   const conditions: Array<[string, string]> = [
     ["Moneda cotizada", CURRENCY_NAMES[currency] || currency],
     ["Forma de pago", quotation.paymentForm || "-"],
     ["Validez de la oferta", quotation.validity || "-"],
   ];
-  if (deliveryDays > 0) {
-    conditions.push(["Plazo de entrega", `${deliveryDays} días hábiles`]);
-  }
 
   const blockHeight = conditions.length * 20 + 150;
   if (y + 14 + blockHeight > pageHeight - 70) {
@@ -435,6 +431,10 @@ export function renderQuotationPdf(doc: PDFKit.PDFDocument, quotation: Quotation
   }
 }
 
+/** Observation images stay small thumbnails: at most this tall (one image / several). */
+const SINGLE_IMAGE_MAX_HEIGHT = 130;
+const IMAGE_MAX_HEIGHT = 95;
+
 /** Space kept below the images for "Atentamente", the signature and the signer lines. */
 const SIGNATURE_BLOCK_HEIGHT = 150;
 
@@ -463,12 +463,12 @@ function drawObservationImages(
   const layoutFor = (available: number) => {
     // Try from few big images to many small ones; take the first that fits the space
     const maxColumns = Math.min(images.length, 6);
-    for (let columns = images.length === 1 ? 1 : 2; columns <= maxColumns; columns++) {
+    for (let columns = images.length === 1 ? 1 : Math.min(images.length, 3); columns <= maxColumns; columns++) {
       const rows = Math.ceil(images.length / columns);
       const cellWidth = (contentWidth - gap * (columns - 1)) / columns;
       const fitHeight = (available - gap * (rows - 1)) / rows - captionHeight - 10;
       // Never taller than the image box would be at its width (avoids empty space)
-      const imageHeight = Math.min(fitHeight, cellWidth * 0.75, columns === 1 ? 220 : 160);
+      const imageHeight = Math.min(fitHeight, cellWidth * 0.75, columns === 1 ? SINGLE_IMAGE_MAX_HEIGHT : IMAGE_MAX_HEIGHT);
       if (imageHeight >= minImageHeight) return { columns, rows, cellWidth, imageHeight };
     }
     return null;
