@@ -41,6 +41,11 @@ export class UpdateBillingDocumentDto {
   @IsDateString()
   issueDate?: string | null;
 
+  /** Day it was collected; null marks it as not collected again */
+  @IsOptional()
+  @IsDateString()
+  paidAt?: string | null;
+
   @IsOptional()
   @IsString()
   @MaxLength(255)

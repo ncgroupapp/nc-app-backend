@@ -76,7 +76,30 @@ export interface DashboardOverview {
     }>;
   };
   certificates: Array<{ id: number; name: string; status: CertificateStatus; daysLeft: number | null }>;
+  /** Products of open licitations that no supplier has quoted yet */
+  missingOffers: { products: number; licitations: number; nextDeadline: string | null };
+  /** Finished quotations (with VAT) of licitations still waiting to be adjudicated */
+  atStake: MoneyByCurrency & { quotations: number };
+  /** Open licitations closing in the next 7 days, soonest first */
+  agenda: AgendaItem[];
+  /** Invoices not marked as collected, by when they fall due (60 business days after the invoice date) */
+  collections: Record<"overdue" | "thisWeek" | "restOfMonth" | "nextMonth", MoneyByCurrency & { invoices: number }>;
 }
+
+export interface AgendaItem {
+  id: number;
+  callNumber: string;
+  clientName: string | null;
+  /** YYYY-MM-DD and HH:MM in Uruguay */
+  deadlineDay: string;
+  deadlineTime: string;
+  /** ready: quotation finished and every product has an offer */
+  state: "ready" | "missing_offers" | "unfinished" | "no_quotation";
+  missingOffers: number;
+}
+
+/** Business days (Monday to Friday) until an invoice falls due */
+const PAYMENT_TERM_BUSINESS_DAYS = 60;
 
 const money = (rows: Array<{ currency: string | null; net: string }>): MoneyByCurrency => ({
   UYU: Number(rows.find((r) => r.currency === "UYU")?.net ?? 0),
@@ -98,14 +121,109 @@ export class DashboardOverviewService {
 
   async getOverview(): Promise<DashboardOverview> {
     const today = todayInUruguay();
-    const [billing, licitations, margin, solicitudes, certificates] = await Promise.all([
+    const [billing, licitations, margin, solicitudes, certificates, missingOffers, atStake, agenda, collections] = await Promise.all([
       this.safe("billing", () => this.billing(today), EMPTY_BILLING),
       this.safe("licitations", () => this.licitations(), EMPTY_LICITATIONS),
       this.safe("margin", () => this.margin(today), { last90Days: null, minMargin: 0 }),
       this.safe("solicitudes", () => this.solicitudes(), EMPTY_SOLICITUDES),
       this.safe("certificates", () => this.certificates(today), []),
+      this.safe("missingOffers", () => this.missingOffers(), { products: 0, licitations: 0, nextDeadline: null }),
+      this.safe("atStake", () => this.atStake(), { UYU: 0, USD: 0, quotations: 0 }),
+      this.safe("agenda", () => this.agenda(), []),
+      this.safe("collections", () => this.collections(today), EMPTY_COLLECTIONS),
     ]);
-    return { today, billing, licitations, margin, solicitudes, certificates };
+    return { today, billing, licitations, margin, solicitudes, certificates, missingOffers, atStake, agenda, collections };
+  }
+
+  private async missingOffers(): Promise<DashboardOverview["missingOffers"]> {
+    const [row] = await this.dataSource.query(
+      `SELECT COUNT(DISTINCT lp."productId")::int AS products, COUNT(DISTINCT lp."licitationId")::int AS licitations,
+              to_char(MIN(l."deadlineDate") FILTER (WHERE l."deadlineDate" >= ${NOW_UY}), 'YYYY-MM-DD HH24:MI') AS "nextDeadline"
+         FROM licitation_products lp
+         JOIN licitations l ON l.id = lp."licitationId"
+        WHERE l.status = ANY($1)
+          AND NOT EXISTS (SELECT 1 FROM offers o WHERE o."productId" = lp."productId")`,
+      [OPEN],
+    );
+    return { products: row.products, licitations: row.licitations, nextDeadline: row.nextDeadline };
+  }
+
+  private async atStake(): Promise<DashboardOverview["atStake"]> {
+    const rows: Array<{ currency: string; total: string; quotations: number }> = await this.dataSource.query(
+      `SELECT qi.currency, SUM(qi."priceWithIVA" * qi.quantity) AS total, COUNT(DISTINCT q.id)::int AS quotations
+         FROM quotations q
+         JOIN licitations l ON l.id = q."licitationId"
+         JOIN quotation_items qi ON qi."quotationId" = q.id
+        WHERE q.status = 'finalizada' AND l.status = $1
+        GROUP BY qi.currency`,
+      [LicitationStatus.QUOTED],
+    );
+    const [count] = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS n FROM quotations q JOIN licitations l ON l.id = q."licitationId"
+        WHERE q.status = 'finalizada' AND l.status = $1`,
+      [LicitationStatus.QUOTED],
+    );
+    return {
+      UYU: Math.round(Number(rows.find((r) => r.currency === "UYU")?.total ?? 0)),
+      USD: Math.round(Number(rows.find((r) => r.currency === "USD")?.total ?? 0)),
+      quotations: count.n,
+    };
+  }
+
+  private async agenda(): Promise<AgendaItem[]> {
+    const rows: Array<Omit<AgendaItem, "state"> & { quotationStatus: string | null }> = await this.dataSource.query(
+      `SELECT l.id, l."callNumber", c.name AS "clientName",
+              to_char(l."deadlineDate", 'YYYY-MM-DD') AS "deadlineDay", to_char(l."deadlineDate", 'HH24:MI') AS "deadlineTime",
+              (SELECT q.status FROM quotations q WHERE q."licitationId" = l.id ORDER BY q."createdAt" DESC LIMIT 1) AS "quotationStatus",
+              (SELECT COUNT(*)::int FROM licitation_products lp WHERE lp."licitationId" = l.id
+                  AND NOT EXISTS (SELECT 1 FROM offers o WHERE o."productId" = lp."productId")) AS "missingOffers"
+         FROM licitations l
+         LEFT JOIN clients c ON c.id = l."clientId"
+        WHERE l.status = ANY($1) AND l."deadlineDate" >= ${NOW_UY} AND l."deadlineDate" < ${NOW_UY}::date + 7
+        ORDER BY l."deadlineDate"`,
+      [OPEN],
+    );
+    return rows.map(({ quotationStatus, ...item }) => ({
+      ...item,
+      state: item.missingOffers > 0
+        ? "missing_offers"
+        : quotationStatus === "finalizada"
+          ? "ready"
+          : quotationStatus
+            ? "unfinished"
+            : "no_quotation",
+    }));
+  }
+
+  private async collections(today: string): Promise<DashboardOverview["collections"]> {
+    // The due date is the 60th weekday after the invoice date
+    const rows: Array<{ bucket: keyof DashboardOverview["collections"]; currency: string | null; total: string; invoices: number }> =
+      await this.dataSource.query(
+        `WITH due AS (
+           SELECT d.currency, d.total,
+                  (SELECT day::date FROM generate_series(d."issueDate" + 1, d."issueDate" + $2::int * 2 + 14, interval '1 day') day
+                    WHERE EXTRACT(ISODOW FROM day) < 6 ORDER BY day OFFSET $2::int - 1 LIMIT 1) AS "dueDate"
+             FROM billing_documents d
+            WHERE d.type = 'factura' AND d."paidAt" IS NULL AND d."issueDate" IS NOT NULL
+         )
+         SELECT CASE
+                  WHEN "dueDate" < $1::date THEN 'overdue'
+                  WHEN "dueDate" <= $1::date + 7 THEN 'thisWeek'
+                  WHEN "dueDate" < date_trunc('month', $1::date) + interval '1 month' THEN 'restOfMonth'
+                  WHEN "dueDate" < date_trunc('month', $1::date) + interval '2 months' THEN 'nextMonth'
+                END AS bucket,
+                currency, SUM(COALESCE(total, 0)) AS total, COUNT(*)::int AS invoices
+           FROM due GROUP BY 1, 2`,
+        [today, PAYMENT_TERM_BUSINESS_DAYS],
+      );
+    const result = structuredClone(EMPTY_COLLECTIONS);
+    for (const row of rows) {
+      if (!row.bucket) continue;
+      const bucket = result[row.bucket];
+      if (row.currency === "UYU" || row.currency === "USD") bucket[row.currency] += Math.round(Number(row.total));
+      bucket.invoices += row.invoices;
+    }
+    return result;
   }
 
   /** One section failing (e.g. a table not created yet) must not break the whole dashboard */
@@ -319,6 +437,13 @@ const EMPTY_LICITATIONS: DashboardOverview["licitations"] = {
   adjudicationRate: null,
   adjudicationRatePrevious: null,
   funnel: { received: 0, quoted: 0, adjudicated: 0, delivered: 0 },
+};
+
+const EMPTY_COLLECTIONS: DashboardOverview["collections"] = {
+  overdue: { UYU: 0, USD: 0, invoices: 0 },
+  thisWeek: { UYU: 0, USD: 0, invoices: 0 },
+  restOfMonth: { UYU: 0, USD: 0, invoices: 0 },
+  nextMonth: { UYU: 0, USD: 0, invoices: 0 },
 };
 
 const EMPTY_SOLICITUDES: DashboardOverview["solicitudes"] = {

@@ -102,6 +102,10 @@ export class BillingDocument {
   @Column({ type: "text", nullable: true, select: false })
   rawText!: string | null;
 
+  /** Day the invoice was collected; null while it is still to be collected */
+  @Column({ type: "date", nullable: true })
+  paidAt!: string | null;
+
   /** True when number, date or total could not be read and someone should check the document */
   @Column({ type: "boolean", default: false })
   needsReview!: boolean;
