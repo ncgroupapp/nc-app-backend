@@ -19,7 +19,7 @@ import {
   ApiOperation,
   ApiResponse,
 } from "@nestjs/swagger";
-import { LicitationDeleteImpact, LicitationsService } from "./licitations.service";
+import { CostComparisonProduct, LicitationDeleteImpact, LicitationsService } from "./licitations.service";
 import { CreateLicitationDto } from "./dto/create-licitation.dto";
 import { UpdateLicitationDto } from "./dto/update-licitation.dto";
 import { Licitation } from "./entities/licitation.entity";
@@ -97,6 +97,12 @@ export class LicitationsController {
   ): Promise<Licitation> {
     this.logger.log(`PATCH /licitations/${id} - Updating licitation`);
     return this.licitationsService.update(id, updateLicitationDto);
+  }
+
+  @Get(":id/cost-comparison")
+  @ApiOperation({ summary: "Supplier offers (price, VAT, brand, delivery, origin) for each requested product" })
+  async getCostComparison(@Param("id", ParseIntPipe) id: number): Promise<CostComparisonProduct[]> {
+    return this.licitationsService.getCostComparison(id);
   }
 
   @Get(":id/delete-impact")

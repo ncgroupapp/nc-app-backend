@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   Logger,
+  OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -16,7 +17,7 @@ import { OfferFiltersDto } from "./dto/offer-filters.dto";
 import { ERROR_MESSAGES } from "../shared/constants/error-messages.constants";
 
 @Injectable()
-export class OffersService {
+export class OffersService implements OnModuleInit {
   private readonly logger = new Logger(OffersService.name);
 
   constructor(
@@ -27,6 +28,17 @@ export class OffersService {
     @InjectRepository(Provider)
     private readonly providerRepository: Repository<Provider>,
   ) {}
+
+  /** Adds the brand column in databases created before it (migrations are not run on deploy). */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.offerRepository.query(
+        `ALTER TABLE "offers" ADD COLUMN IF NOT EXISTS "brand" character varying(100)`,
+      );
+    } catch (error) {
+      this.logger.error("Could not ensure offer brand column", error instanceof Error ? error.stack : String(error));
+    }
+  }
 
   async create(createOfferDto: CreateOfferDto): Promise<Offer> {
     this.logger.log(
@@ -220,6 +232,7 @@ export class OffersService {
       deliveryDate: new Date(createOfferDto.deliveryDate),
       delivery: createOfferDto.delivery,
       origin: createOfferDto.origin,
+      brand: createOfferDto.brand,
       quantity: createOfferDto.quantity,
       product,
       provider,

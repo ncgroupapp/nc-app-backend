@@ -99,6 +99,15 @@ export class CreateOfferDto {
   origin?: string;
 
   @ApiProperty({
+    description: "Brand offered by the provider",
+    example: "SKF",
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @ApiProperty({
     description: "Quantity",
     example: 10,
   })

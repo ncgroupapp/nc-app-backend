@@ -41,6 +41,10 @@ export class Offer {
   @Column({ type: "varchar", length: 100, nullable: true })
   origin?: string;
 
+  /** Brand the provider offers, which may differ from the product's own brand. */
+  @Column({ type: "varchar", length: 100, nullable: true })
+  brand?: string;
+
   @Column({ type: "int" })
   quantity!: number;
 

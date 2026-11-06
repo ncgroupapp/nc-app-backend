@@ -25,6 +25,31 @@ export interface LicitationDeleteImpact {
   canDelete: boolean;
 }
 
+export interface CostComparisonOffer {
+  offerId: number;
+  providerId: number;
+  providerName: string;
+  /** Brand the provider offers (null when it was not loaded). */
+  brand: string | null;
+  currency: string;
+  /** Unit price without VAT. */
+  price: number;
+  /** VAT percentage (e.g. 22). */
+  iva: number;
+  /** Delivery time in days. */
+  delivery: number;
+  origin: string | null;
+}
+
+export interface CostComparisonProduct {
+  productId: number;
+  name: string;
+  code: string | null;
+  productBrand: string | null;
+  quantity: number;
+  offers: CostComparisonOffer[];
+}
+
 @Injectable()
 export class LicitationsService {
   private readonly logger = new Logger(LicitationsService.name);
@@ -307,6 +332,37 @@ export class LicitationsService {
    * What deleting a licitation would remove. Licitations with adjudications or deliveries
    * cannot be deleted (they are real business records); their quotations are deleted with it.
    */
+  /** Every supplier offer for each requested product of the licitation, cheapest (with VAT) first. */
+  async getCostComparison(id: number): Promise<CostComparisonProduct[]> {
+    const licitation = await this.licitationRepository.findOne({ where: { id } });
+    if (!licitation) throw new NotFoundException(`Licitación ${id} no encontrada`);
+
+    const rows: Array<Omit<CostComparisonProduct, "offers"> & Partial<CostComparisonOffer>> =
+      await this.licitationRepository.query(
+        `SELECT p.id AS "productId", p.name, p.code, p.brand AS "productBrand", lp.quantity,
+                o.id AS "offerId", o."providerId", pr.name AS "providerName", o.brand,
+                o.currency, o.price::float AS price, o.iva::float AS iva, o.delivery, o.origin
+           FROM licitation_products lp
+           JOIN products p ON p.id = lp."productId"
+           LEFT JOIN offers o ON o."productId" = p.id
+           LEFT JOIN providers pr ON pr.id = o."providerId"
+          WHERE lp."licitationId" = $1
+          ORDER BY lp.id, o.price * (1 + o.iva / 100) ASC NULLS LAST`,
+        [id],
+      );
+
+    const products = new Map<number, CostComparisonProduct>();
+    for (const { productId, name, code, productBrand, quantity, offerId, ...offer } of rows) {
+      if (!products.has(productId)) {
+        products.set(productId, { productId, name, code, productBrand, quantity, offers: [] });
+      }
+      if (offerId) {
+        products.get(productId)!.offers.push({ ...(offer as Omit<CostComparisonOffer, "offerId">), offerId });
+      }
+    }
+    return [...products.values()];
+  }
+
   async getDeleteImpact(id: number): Promise<LicitationDeleteImpact> {
     const licitation = await this.licitationRepository.findOne({ where: { id } });
     if (!licitation) throw new NotFoundException(`Licitación ${id} no encontrada`);
