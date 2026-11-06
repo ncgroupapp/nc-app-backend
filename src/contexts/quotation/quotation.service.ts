@@ -206,6 +206,11 @@ export class QuotationService {
 
       // Crear nuevos items
       quotation.items = await Promise.all(updateQuotationDto.items.map(async (item) => {
+        // An item priced from a supplier offer belongs to that offer's product (the PDF needs its code)
+        if (!item.productId && item.offerId) {
+          const offer = await this.offerRepository.findOne({ where: { id: item.offerId } });
+          if (offer) item = { ...item, productId: offer.productId };
+        }
         // Usar productName, brand, origin del DTO si existen, o buscarlos por productId
         let productName = item.productName;
         let brand = item.brand;
