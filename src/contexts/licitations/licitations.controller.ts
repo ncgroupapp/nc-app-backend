@@ -22,7 +22,7 @@ import {
 import { CostComparisonProduct, LicitationDeleteImpact, LicitationsService } from "./licitations.service";
 import { CreateLicitationDto } from "./dto/create-licitation.dto";
 import { UpdateLicitationDto } from "./dto/update-licitation.dto";
-import { Licitation } from "./entities/licitation.entity";
+import { Licitation, LicitationStatus } from "./entities/licitation.entity";
 import { PaginationDto } from "../shared/dto/pagination.dto";
 import { PaginatedResult } from "../shared/interfaces/paginated-result.interface";
 import { TransformInterceptor } from "../shared/interceptors/transform.interceptor";
@@ -49,6 +49,12 @@ export class LicitationsController {
   ): Promise<Licitation> {
     this.logger.log(`POST /licitations - Creating licitation with call number: ${createLicitationDto.callNumber}`);
     return this.licitationsService.create(createLicitationDto);
+  }
+
+  @Get("status-counts")
+  @ApiOperation({ summary: "Number of licitations in each status, over all licitations" })
+  async countByStatus(): Promise<Record<LicitationStatus, number>> {
+    return this.licitationsService.countByStatus();
   }
 
   @Get("next-internal-number")

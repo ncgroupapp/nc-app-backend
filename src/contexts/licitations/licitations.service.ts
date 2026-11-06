@@ -159,6 +159,16 @@ export class LicitationsService {
     return [];
   }
 
+  /** How many licitations there are in each status, over all of them (not just one page). */
+  async countByStatus(): Promise<Record<LicitationStatus, number>> {
+    const rows: Array<{ status: LicitationStatus; count: number }> = await this.licitationRepository.query(
+      `SELECT status, count(*)::int AS count FROM licitations GROUP BY status`,
+    );
+    const counts = Object.fromEntries(Object.values(LicitationStatus).map((s) => [s, 0])) as Record<LicitationStatus, number>;
+    for (const { status, count } of rows) counts[status] = count;
+    return counts;
+  }
+
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<Licitation>> {
     const { page = 1, limit = 10, search, status, clientId, clientIds, dateFrom, dateTo } = paginationDto;
     this.logger.debug(`Finding all licitations with filters: search=${search}, status=${status}, clientId=${clientId}, clientIds=${clientIds}, dateFrom=${dateFrom}, dateTo=${dateTo}`);
