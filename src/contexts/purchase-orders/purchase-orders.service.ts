@@ -2,6 +2,9 @@ import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleIni
 import { DataSource, EntityManager } from "typeorm";
 import { FilterPurchaseOrdersDto, SavePurchaseOrderDto, UpdatePurchaseOrderDto } from "./dto/purchase-order.dto";
 import { CREATE_PURCHASE_ORDERS_TABLES_SQL } from "./purchase-orders.table";
+import { ParsedPurchaseOrder, parsePurchaseOrder } from "./purchase-order.parser";
+import { readPdfText } from "../billing/pdf-reader";
+import { matchClient, MatchableClient } from "../billing/client-matcher";
 
 export const MAX_PURCHASE_ORDER_FILE_SIZE = 15 * 1024 * 1024;
 const ALLOWED_FILE = /\.(pdf|png|jpe?g|webp)$/i;
@@ -24,6 +27,30 @@ export interface PurchaseOrderView {
   remitos: Array<{ id: number; number: number; date: string; status: string }>;
   createdAt: string;
 }
+
+export interface PurchaseOrderReading extends ParsedPurchaseOrder {
+  /** False when the PDF has no text (a scan) and nothing could be read */
+  readable: boolean;
+  /** Client of the app matched by RUT or name */
+  client: { id: number; name: string } | null;
+  /** Licitation whose call number is the purchase the order comes from */
+  licitation: { id: number; callNumber: string; internalNumber: string | null } | null;
+  /** An order with the same number is already loaded */
+  existingOrderId: number | null;
+}
+
+const EMPTY_READING: Omit<PurchaseOrderReading, "readable"> = {
+  number: null,
+  issueDate: null,
+  clientName: null,
+  clientRut: null,
+  currency: null,
+  total: null,
+  purchaseNumber: null,
+  client: null,
+  licitation: null,
+  existingOrderId: null,
+};
 
 export interface PurchaseOrderMetrics {
   total: number;
@@ -153,6 +180,58 @@ export class PurchaseOrdersService implements OnModuleInit {
       [id, file.fileName.slice(0, 255), file.mimeType || "application/octet-stream", file.data.length, file.data],
     );
     return this.findOne(id);
+  }
+
+  /**
+   * Reads number, date, client, total and source purchase from an order PDF, and finds the
+   * client, the licitation and an already loaded order with the same number.
+   * Scanned PDFs have no text: everything comes back empty and `readable` is false.
+   */
+  async read(file: { fileName: string; data: Buffer }): Promise<PurchaseOrderReading> {
+    if (!/\.pdf$/i.test(file.fileName)) return { ...EMPTY_READING, readable: false };
+    let text = "";
+    try {
+      text = await readPdfText(file.data);
+    } catch (error) {
+      this.logger.warn(`Could not read purchase order ${file.fileName}: ${error instanceof Error ? error.message : error}`);
+    }
+    if (!text.trim()) return { ...EMPTY_READING, readable: false };
+
+    const parsed = parsePurchaseOrder(text);
+    const clients: MatchableClient[] = await this.dataSource.query(`SELECT id, name, identifier FROM clients`);
+    const clientMatch = matchClient({ clientRut: parsed.clientRut, clientName: parsed.clientName }, clients);
+    const client = clientMatch ? clients.find((c) => c.id === clientMatch.clientId) ?? null : null;
+
+    // "CD 2026 2796" against call numbers like "I.SALTO CD 2026 2796": compare without spaces or dots
+    let licitation: PurchaseOrderReading["licitation"] = null;
+    if (parsed.purchaseNumber) {
+      const key = parsed.purchaseNumber.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const [found] = await this.dataSource.query(
+        `SELECT id, "callNumber", "internalNumber" FROM licitations
+          WHERE regexp_replace(upper("callNumber"), '[^A-Z0-9]', '', 'g') LIKE '%' || $1
+          ORDER BY "createdAt" DESC LIMIT 1`,
+        [key],
+      );
+      licitation = found ?? null;
+    }
+
+    // Same digits = same order, however it was typed ("OC 2026 5199", "I.SALTO- OC 2026 5199")
+    const digits = parsed.number?.replace(/\D/g, "") ?? "";
+    const [existing] =
+      digits.length >= 4
+        ? await this.dataSource.query(
+            `SELECT id FROM purchase_orders WHERE regexp_replace(number, '\\D', '', 'g') = $1 LIMIT 1`,
+            [digits],
+          )
+        : [];
+
+    return {
+      readable: true,
+      ...parsed,
+      client: client ? { id: client.id, name: client.name } : null,
+      licitation,
+      existingOrderId: existing?.id ?? null,
+    };
   }
 
   async getFile(id: number): Promise<{ fileName: string; mimeType: string; fileData: Buffer }> {

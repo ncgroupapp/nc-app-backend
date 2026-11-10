@@ -43,6 +43,21 @@ export class PurchaseOrdersController {
     return this.purchaseOrdersService.metrics();
   }
 
+  @Post("read")
+  @ApiOperation({ summary: "Leer número, fecha, cliente, total y licitación del PDF de una orden (sin guardarla)" })
+  @ApiConsumes("multipart/form-data")
+  async read(@Req() req: FastifyRequest) {
+    const request = req as MultipartRequest;
+    if (typeof request.isMultipart !== "function" || !request.isMultipart()) {
+      throw new BadRequestException("Enviá el archivo como multipart/form-data");
+    }
+    const part = await request.file({ limits: { fileSize: MAX_PURCHASE_ORDER_FILE_SIZE } });
+    if (!part) throw new BadRequestException("No se recibió ningún archivo");
+    const data = await part.toBuffer();
+    if (part.file.truncated) throw new BadRequestException("El archivo supera los 15 MB");
+    return this.purchaseOrdersService.read({ fileName: part.filename, data });
+  }
+
   @Post()
   create(@Body() dto: SavePurchaseOrderDto) {
     return this.purchaseOrdersService.create(dto);
