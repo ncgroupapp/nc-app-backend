@@ -42,7 +42,46 @@ function parseDate(value: string): string | null {
 /** Our own RUT appears as the supplier's; it must never be taken as the client's */
 const OWN_RUT = "190323070010";
 
+/** Name the Intendencia de Montevideo's notifications stand for (they never print it) */
+export const MONTEVIDEO_NAME = "INTENDENCIA DE MONTEVIDEO";
+/** Its RUT, so the order is linked to the client even if the name in the app is written differently */
+const MONTEVIDEO_RUT = "211763350018";
+
+/**
+ * The Intendencia de Montevideo does not send an "orden de compra" but a "Notificación de
+ * Adjudicación" (montevideo.gub.uy), with no RUT of its own:
+ *
+ *   N° Compra D197137                  ← the purchase (licitation "IMM - D197137")
+ *   N° de Pedido: D197137001           ← the order number invoices must quote
+ *   Montevideo, 07.11.2026             ← date
+ *   Total Proveedor USD 597,80         ← total with VAT
+ *
+ * One of the PDF readers puts the labels and their values on separate lines, so values are
+ * looked for by their shape rather than right after the label.
+ */
+function parseMontevideoNotification(text: string): ParsedPurchaseOrder {
+  const flat = text.replace(/\s+/g, " ");
+  const purchase = flat.match(/N[°º]\s*Compra\s*:?\s*(D\d{5,8})\b/i) ?? flat.match(/CD\s*N[°º]\s*(D\d{5,8})\b/i);
+  const order = flat.match(/N[°º]\s*de\s*Pedido\s*:?\s*(D\d{8,12})\b/i) ?? flat.match(/\b(D\d{9,12})\b/);
+  const date = flat.match(/Montevideo,\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
+  // "Total Proveedor USD 597,80", not "Total Proveedor sin IVA USD 490,00"
+  const total = flat.match(/Total\s*Proveedor\s*(USD|UYU|U\$S|\$U|\$)\s*([\d.]+,\d{2})/i);
+  return {
+    number: order?.[1] ?? null,
+    issueDate: date ? `${date[3]}-${date[2].padStart(2, "0")}-${date[1].padStart(2, "0")}` : null,
+    clientName: MONTEVIDEO_NAME,
+    clientRut: MONTEVIDEO_RUT,
+    currency: total ? (/^(UYU|\$U|\$)$/i.test(total[1]) ? "UYU" : "USD") : null,
+    total: total ? parseAmount(total[2]) : null,
+    purchaseNumber: purchase?.[1] ?? null,
+  };
+}
+
 export function parsePurchaseOrder(text: string): ParsedPurchaseOrder {
+  if (/NOTIFICACI[ÓO]N DE ADJUDICACI[ÓO]N/i.test(text) && /montevideo/i.test(text)) {
+    return parseMontevideoNotification(text);
+  }
+
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const result: ParsedPurchaseOrder = {
     number: null,
