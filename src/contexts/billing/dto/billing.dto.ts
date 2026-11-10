@@ -19,6 +19,11 @@ export class FilterBillingDocumentsDto extends PaginationDto {
   @IsOptional()
   @IsIn(BILLING_SORTS)
   sort?: BillingSort;
+
+  /** por_cobrar: invoices not marked as collected; vencida: those past their due date (60 business days) */
+  @IsOptional()
+  @IsIn(["por_cobrar", "vencida"])
+  collection?: "por_cobrar" | "vencida";
 }
 
 /** Manual corrections for data that could not be read from the file */

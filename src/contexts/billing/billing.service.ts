@@ -33,6 +33,21 @@ export type IngestResult =
 /** Numeric value of the document number ("0001234" → 1234), so 10 sorts after 9 */
 const NUMBER_SQL = `CAST(NULLIF(regexp_replace(doc.number, '\\D', '', 'g'), '') AS bigint)`;
 
+/** Due date of an invoice: the 60th business day (Monday to Friday) after its issue date */
+const DUE_DATE_SQL = `(SELECT day::date FROM generate_series("doc"."issueDate" + 1, "doc"."issueDate" + 134, interval '1 day') day
+   WHERE EXTRACT(ISODOW FROM day) < 6 ORDER BY day OFFSET 59 LIMIT 1)`;
+const TODAY_SQL = `(now() AT TIME ZONE 'America/Montevideo')::date`;
+const UNPAID_INVOICE_SQL = `"doc"."type" = 'factura' AND "doc"."paidAt" IS NULL`;
+
+/** How many documents each tab of the page would show, with the other filters applied */
+export interface BillingTabCounts {
+  all: number;
+  invoices: number;
+  creditNotes: number;
+  toCollect: number;
+  overdue: number;
+}
+
 export interface BillingSummaryRow {
   currency: string;
   invoiceCount: number;
@@ -237,6 +252,7 @@ export class BillingService implements OnModuleInit {
       data,
       meta: { total, page, limit, lastPage: Math.max(1, Math.ceil(total / limit)) },
       summary: await this.summary(filters),
+      tabCounts: await this.tabCounts(filters),
     };
   }
 
@@ -264,6 +280,24 @@ export class BillingService implements OnModuleInit {
         net: Math.round((invoiceTotal - creditNoteTotal) * 100) / 100,
       };
     });
+  }
+
+  /** Counts for the tabs (all, invoices, credit notes, to collect, overdue) ignoring the type and collection filters */
+  async tabCounts(filters: FilterBillingDocumentsDto): Promise<BillingTabCounts> {
+    const row = await this.applyFilters(this.repository.createQueryBuilder("doc"), { ...filters, collection: undefined }, false)
+      .select("COUNT(*)", "all")
+      .addSelect(`COUNT(*) FILTER (WHERE "doc"."type" = 'factura')`, "invoices")
+      .addSelect(`COUNT(*) FILTER (WHERE "doc"."type" = 'nota_credito')`, "creditNotes")
+      .addSelect(`COUNT(*) FILTER (WHERE ${UNPAID_INVOICE_SQL})`, "toCollect")
+      .addSelect(`COUNT(*) FILTER (WHERE ${UNPAID_INVOICE_SQL} AND "doc"."issueDate" IS NOT NULL AND ${DUE_DATE_SQL} < ${TODAY_SQL})`, "overdue")
+      .getRawOne<Record<keyof BillingTabCounts, string>>();
+    return {
+      all: Number(row?.all ?? 0),
+      invoices: Number(row?.invoices ?? 0),
+      creditNotes: Number(row?.creditNotes ?? 0),
+      toCollect: Number(row?.toCollect ?? 0),
+      overdue: Number(row?.overdue ?? 0),
+    };
   }
 
   async findOne(id: number): Promise<BillingDocument> {
@@ -331,6 +365,10 @@ export class BillingService implements OnModuleInit {
     if (filters.currency) query.andWhere("doc.currency = :currency", { currency: filters.currency });
     if (filters.dateFrom) query.andWhere("doc.issueDate >= :dateFrom", { dateFrom: filters.dateFrom });
     if (filters.dateTo) query.andWhere("doc.issueDate <= :dateTo", { dateTo: filters.dateTo });
+    if (filters.collection) query.andWhere(UNPAID_INVOICE_SQL);
+    if (filters.collection === "vencida") {
+      query.andWhere(`"doc"."issueDate" IS NOT NULL AND ${DUE_DATE_SQL} < ${TODAY_SQL}`);
+    }
     const search = filters.search?.trim();
     if (search) {
       const compact = search.replace(/[\s-]/g, "");
