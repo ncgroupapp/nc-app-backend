@@ -54,14 +54,17 @@ export function parsePurchaseOrder(text: string): ParsedPurchaseOrder {
     purchaseNumber: null,
   };
 
+  // The PDF readers do not agree on the order of the header lines, nor on what shares a line
+  // (the order number can come glued to the agency's address), so nothing here relies on
+  // a value being alone on its line or on a fixed line order.
   for (const [i, line] of lines.entries()) {
     if (!result.number) {
-      const number = line.match(/^(?:OC|O\.C\.|ORDEN DE COMPRA N[°º.]?)\s*:?\s*(\d{4}\s+\d+|\d[\d\s/-]*\d)$/i);
+      const number = line.match(/(?:^|\s)(?:OC|O\.C\.)\s*:?\s*(\d{4}\s+\d{1,7})(?:\s|$)/i);
       if (number) result.number = `OC ${number[1].replace(/\s+/g, " ")}`;
     }
 
     if (!result.clientRut) {
-      const rut = line.match(/^R\.?U\.?[CT]\.?\s*:?\s*(\d{12})$/i);
+      const rut = line.match(/R\.?U\.?[CT]\.?\s*:?\s*(\d{12})\b/i);
       if (rut && rut[1] !== OWN_RUT) result.clientRut = rut[1];
     }
 
@@ -70,18 +73,13 @@ export function parsePurchaseOrder(text: string): ParsedPurchaseOrder {
       if (purchase) result.purchaseNumber = purchase[1].trim();
     }
 
-    // The agency's name comes right under the "ORDEN DE COMPRA" title
-    if (!result.clientName && /^ORDEN DE COMPRA$/i.test(line) && lines[i + 1] && !/^ART[IÍ]CULO/i.test(lines[i + 1])) {
-      result.clientName = lines[i + 1];
-    }
-
-    // The date is under the copy type ("Principal") that follows the order number
-    if (!result.issueDate && /^principal$/i.test(line) && lines[i + 1]) {
-      result.issueDate = parseDate(lines[i + 1]);
+    // The agency's name is next to the "ORDEN DE COMPRA" title: under it or above it
+    if (!result.clientName && /^ORDEN DE COMPRA$/i.test(line)) {
+      result.clientName = [lines[i + 1], lines[i - 1]].find((candidate) => candidate && looksLikeAgencyName(candidate)) ?? null;
     }
 
     if (result.total === null) {
-      const total = line.match(/^TOTAL\s*(UYU|USD|\$U|U\$S|US\$)\s*([\d.]+,\d{2})$/i);
+      const total = line.match(/TOTAL\s*(UYU|USD|\$U|U\$S|US\$)\s*([\d.]+,\d{2})/i);
       if (total) {
         result.currency = /^(UYU|\$U)$/i.test(total[1]) ? "UYU" : "USD";
         result.total = parseAmount(total[2]);
@@ -89,11 +87,22 @@ export function parsePurchaseOrder(text: string): ParsedPurchaseOrder {
     }
   }
 
-  // Fallback for the date: the entry date some orders print
-  if (!result.issueDate) {
-    const entry = lines.findIndex((line) => /^Fecha de ingreso:?$/i.test(line));
-    if (entry >= 0 && lines[entry + 1]) result.issueDate = parseDate(lines[entry + 1]);
+  // The order date is the first date printed on its own (the entry date comes later)
+  for (const line of lines) {
+    const date = /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(line) ? parseDate(line) : null;
+    if (date) {
+      result.issueDate = date;
+      break;
+    }
   }
 
   return result;
+}
+
+/** Not the copy type ("Principal"), a date, a column header or a line full of numbers */
+function looksLikeAgencyName(line: string): boolean {
+  if (/^(principal|copia|duplicado|original)$/i.test(line)) return false;
+  if (/^ART[IÍ]CULO/i.test(line) || /^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(line)) return false;
+  const letters = line.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, "").length;
+  return letters >= 4 && letters >= line.replace(/\s/g, "").length * 0.6;
 }
