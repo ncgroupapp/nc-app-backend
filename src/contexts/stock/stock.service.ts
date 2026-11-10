@@ -36,10 +36,17 @@ export interface StockItemView {
   lastPurchase: StockPurchaseView | null;
 }
 
+/** Products with this many units or fewer count as "pocas unidades" */
+const LOW_STOCK_UNITS = 2;
+
 export interface StockSummary {
   productsInStock: number;
   unitsInStock: number;
   productsWithCost: number;
+  /** Products with 1 or 2 units left */
+  lowStock: number;
+  /** Brands with the most products in stock */
+  topBrands: Array<{ brand: string; products: number; units: number }>;
   /** Valor del stock (stock actual × costo de la última compra), agrupado por moneda. */
   valueByCurrency: Array<{ currency: string; value: number }>;
 }
@@ -96,6 +103,15 @@ export class StockService implements OnModuleInit {
         { search: `%${filters.search}%` },
       );
     }
+    if (filters.brand) {
+      qb.andWhere("upper(trim(product.brand)) = upper(trim(:brand))", { brand: filters.brand });
+    }
+    if (filters.view === "pocas") {
+      qb.andWhere(`product.stockQuantity <= ${LOW_STOCK_UNITS}`);
+    }
+    if (filters.view === "sin_costo") {
+      qb.andWhere(`NOT EXISTS (SELECT 1 FROM "stock_purchases" sp WHERE sp."productId" = product.id)`);
+    }
 
     const [products, total] = await qb.getManyAndCount();
     const purchasesByProduct = await this.purchasesByProduct(products.map(p => p.id));
@@ -120,8 +136,15 @@ export class StockService implements OnModuleInit {
 
   async getSummary(): Promise<StockSummary> {
     const [totals] = await this.dataSource.query(
-      `SELECT COUNT(*)::int AS "productsInStock", COALESCE(SUM("stockQuantity"), 0)::int AS "unitsInStock"
+      `SELECT COUNT(*)::int AS "productsInStock", COALESCE(SUM("stockQuantity"), 0)::int AS "unitsInStock",
+              COUNT(*) FILTER (WHERE "stockQuantity" <= ${LOW_STOCK_UNITS})::int AS "lowStock"
        FROM "products" WHERE COALESCE("stockQuantity", 0) > 0`,
+    );
+    const topBrands: Array<{ brand: string; products: number; units: number }> = await this.dataSource.query(
+      `SELECT upper(trim("brand")) AS "brand", COUNT(*)::int AS "products", SUM("stockQuantity")::int AS "units"
+       FROM "products"
+       WHERE COALESCE("stockQuantity", 0) > 0 AND COALESCE(trim("brand"), '') <> ''
+       GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 6`,
     );
     const valueRows: Array<{ currency: string; value: string; products: number }> = await this.dataSource.query(
       `SELECT lp."currency" AS "currency", SUM(lp."unitCost" * p."stockQuantity") AS "value", COUNT(*)::int AS "products"
@@ -141,6 +164,8 @@ export class StockService implements OnModuleInit {
       productsInStock: totals?.productsInStock ?? 0,
       unitsInStock: totals?.unitsInStock ?? 0,
       productsWithCost: valueRows.reduce((acc, row) => acc + Number(row.products), 0),
+      lowStock: totals?.lowStock ?? 0,
+      topBrands,
       valueByCurrency: valueRows.map(row => ({ currency: row.currency, value: Number(row.value) })),
     };
   }
