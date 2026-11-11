@@ -27,6 +27,7 @@ import { DashboardModule } from "../contexts/dashboard/dashboard.module";
 import { BillingModule } from "../contexts/billing/billing.module";
 import { CertificatesModule } from "../contexts/certificates/certificates.module";
 import { PurchaseOrdersModule } from "../contexts/purchase-orders/purchase-orders.module";
+import { CollectionsModule } from "../contexts/collections/collections.module";
 
 import { AuthMiddleware } from "@/src/contexts/auth/middlewares/auth.middleware";
 import { LoggerMiddleware } from "@/shared/logger/logger.middleware";
@@ -59,6 +60,7 @@ import { CorrelationIdMiddleware } from "@/shared/middlewares/correlation-id.mid
     BillingModule,
     CertificatesModule,
     PurchaseOrdersModule,
+    CollectionsModule,
   ],
 })
 export class AppModule implements NestModule {
